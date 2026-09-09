@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>French Stream</title>
+
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+
+  <header class="header">
+
+    <div class="logo">
+      <span class="logo-french">FRENCH</span>
+      <span class="logo-play">▶</span>
+      <span class="logo-stream">STREAM</span>
+    </div>
+
+    <div class="header-actions">
+
+      <button class="notification" aria-label="Notifications">
+        ♧
+        <span class="notification-count">3</span>
+      </button>
+
+      <button
+        id="menuButton"
+        class="menu-button"
+        aria-label="Menu"
+      >
+        ☰
+      </button>
+
+    </div>
+
+  </header>
+
+
+  <nav class="navigation">
+
+    <button
+      class="nav-button active"
+      data-action="new"
+    >
+      Nouveautés
+    </button>
+
+    <button
+      class="nav-button"
+      data-action="rating"
+    >
+      Les + Notés
+    </button>
+
+    <button
+      class="nav-button"
+      data-action="comments"
+    >
+      Les + Commentés
+    </button>
+
+    <button
+      class="nav-button"
+      data-action="views"
+    >
+      Les + Regardés
+    </button>
+
+  </nav>
+
+
+  <main class="main">
+
+    <div class="search-container">
+
+      <input
+        id="search"
+        class="search"
+        type="search"
+        placeholder="Rechercher un film ou une série..."
+        autocomplete="off"
+      >
+
+    </div>
+
+
+    <section
+      id="catalog"
+      class="catalog"
+    >
+    </section>
+
+
+    <div
+      id="loading"
+      class="loading"
+    >
+      Chargement...
+    </div>
+
+
+    <div
+      id="empty"
+      class="empty hidden"
+    >
+      Aucun résultat.
+    </div>
+
+  </main>
+
+
+  <aside
+    id="sideMenu"
+    class="side-menu"
+  >
+
+    <div class="side-menu-header">
+
+      <h2>Catégories</h2>
+
+      <button
+        id="closeMenu"
+        class="close-menu"
+      >
+        ×
+      </button>
+
+    </div>
+
+
+    <div class="category-section">
+
+      <h3>Films</h3>
+
+      <button
+        class="category-button"
+        data-type="movie"
+      >
+        Tous les films
+      </button>
+
+      <button
+        class="category-button"
+        data-language="VF"
+      >
+        Films VF
+      </button>
+
+      <button
+        class="category-button"
+        data-language="VOSTFR"
+      >
+        Films VOSTFR
+      </button>
+
+      <button
+        class="category-button"
+        data-language="VO"
+      >
+        Films VO
+      </button>
+
+    </div>
+
+
+    <div class="category-section">
+
+      <h3>Séries</h3>
+
+      <button
+        class="category-button"
+        data-type="series"
+      >
+        Toutes les séries
+      </button>
+
+      <button
+        class="category-button"
+        data-type="series"
+        data-language="VF"
+      >
+        Séries VF
+      </button>
+
+      <button
+        class="category-button"
+        data-type="series"
+        data-language="VOSTFR"
+      >
+        Séries VOSTFR
+      </button>
+
+    </div>
+
+
+    <div class="category-section">
+
+      <h3>Genres</h3>
+
+      <div id="genreList"></div>
+
+    </div>
+
+  </aside>
+
+
+  <div
+    id="menuOverlay"
+    class="menu-overlay"
+  ></div>
+
+
+  <script src="/app.js"></script>
+
+</body>
+</html>
