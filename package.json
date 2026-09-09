@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "FS15-style dynamic catalogue",
-  "main": "server.js",
+  "main": "app.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node app.js"
   },
   "dependencies": {
     "express": "^5.1.0",
