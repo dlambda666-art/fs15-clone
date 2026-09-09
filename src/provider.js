@@ -11,10 +11,6 @@ const PAGES = Number(process.env.FS15_PAGES || 8);
 const REFRESH_MS = Number(process.env.FS15_REFRESH_MS || 600000);
 const MAX_RESULTS = Number(process.env.FS15_MAX_RESULTS || 80);
 
-/*
- * Nombre maximum de fiches FS15 ouvertes simultanément
- * pour compléter les informations.
- */
 const ENRICH_CONCURRENCY = Number(
   process.env.FS15_ENRICH_CONCURRENCY || 6
 );
@@ -207,9 +203,6 @@ function extractCard($, link) {
 
   let node = $(link);
 
-  /*
-   * Recherche du conteneur de la carte.
-   */
   for (let i = 0; i < 6; i++) {
     const text = cleanText(node.text());
     const images = node.find("img");
@@ -618,10 +611,6 @@ async function refresh() {
   }
 
 
-  /*
-   * IMPORTANT :
-   * On conserve l'ordre FS15.
-   */
   const catalogue =
     [...unique.values()];
 
@@ -633,11 +622,6 @@ async function refresh() {
     );
 
 
-  /*
-   * Les fiches sont maintenant
-   * chargées par petits lots
-   * plutôt qu'une par une.
-   */
   await enrichItems(
     limited
   );
