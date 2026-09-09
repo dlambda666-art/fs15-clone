@@ -1,15 +1,19 @@
 const cheerio = require("cheerio");
 
-const BASE_URL = "https://fs15.lol";
+const BASE_URL = "https://fs23.lol";
 
 const SOURCES = {
-  films: "https://fs15.lol/index.php?category=films&do=cat",
-  series: "https://fs15.lol/index.php?category=s-tv&do=cat"
+  films: `${BASE_URL}/index.php?category=films&do=cat`,
+  series: `${BASE_URL}/index.php?category=s-tv&do=cat`
 };
 
 const PAGES = Number(process.env.FS15_PAGES || 8);
-const REFRESH_MS = Number(process.env.FS15_REFRESH_MS || 600000);
-const MAX_RESULTS = Number(process.env.FS15_MAX_RESULTS || 80);
+const REFRESH_MS = Number(
+  process.env.FS15_REFRESH_MS || 600000
+);
+const MAX_RESULTS = Number(
+  process.env.FS15_MAX_RESULTS || 80
+);
 
 const ENRICH_CONCURRENCY = Number(
   process.env.FS15_ENRICH_CONCURRENCY || 6
@@ -24,19 +28,30 @@ let lastUpdate = 0;
    ========================================================= */
 
 async function fetchPage(url) {
+
   const response = await fetch(url, {
     headers: {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+
       "Accept":
-        "text/html,application/xhtml+xml"
+        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+
+      "Accept-Language":
+        "fr-FR,fr;q=0.9,en;q=0.8"
     },
-    signal: AbortSignal.timeout(20000)
+
+    signal:
+      AbortSignal.timeout(20000)
   });
 
+
   if (!response.ok) {
-    throw new Error(`FS15 HTTP ${response.status}`);
+    throw new Error(
+      `FS23 HTTP ${response.status}`
+    );
   }
+
 
   return await response.text();
 }
@@ -47,9 +62,11 @@ async function fetchPage(url) {
    ========================================================= */
 
 function absoluteUrl(url) {
+
   if (!url) {
     return "";
   }
+
 
   if (
     url.startsWith("http://") ||
@@ -58,13 +75,16 @@ function absoluteUrl(url) {
     return url;
   }
 
+
   if (url.startsWith("//")) {
     return "https:" + url;
   }
 
+
   if (url.startsWith("/")) {
     return BASE_URL + url;
   }
+
 
   return BASE_URL + "/" + url;
 }
@@ -75,6 +95,7 @@ function absoluteUrl(url) {
    ========================================================= */
 
 function cleanText(value) {
+
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim();
@@ -86,27 +107,41 @@ function cleanText(value) {
    ========================================================= */
 
 function detectLanguage(text) {
-  const value = cleanText(text).toUpperCase();
 
-  if (value.includes("VF+VOSTFR")) {
+  const value =
+    cleanText(text).toUpperCase();
+
+
+  if (
+    value.includes("VF+VOSTFR")
+  ) {
     return "VF+VOSTFR";
   }
 
-  if (value.includes("VOSTFR")) {
+
+  if (
+    value.includes("VOSTFR")
+  ) {
     return "VOSTFR";
   }
+
 
   if (
     /\bVF\b/.test(value) ||
     value.includes("TRUEFRENCH") ||
+    value.includes("TRUE FRENCH") ||
     value.includes("FRENCH")
   ) {
     return "VF";
   }
 
-  if (/\bVO\b/.test(value)) {
+
+  if (
+    /\bVO\b/.test(value)
+  ) {
     return "VO";
   }
+
 
   return "";
 }
@@ -117,27 +152,43 @@ function detectLanguage(text) {
    ========================================================= */
 
 function detectQuality(text) {
-  const value = cleanText(text).toUpperCase();
+
+  const value =
+    cleanText(text).toUpperCase();
+
 
   const qualities = [
     "2160P",
+    "2160",
     "4K",
     "1080P",
+    "1080",
     "720P",
+    "720",
     "HDLIGHT",
     "HD",
     "WEB-DL",
+    "WEBDL",
     "WEBRIP",
     "BLURAY",
+    "BLU-RAY",
     "BRRIP",
     "DVDRIP"
   ];
 
-  for (const quality of qualities) {
-    if (value.includes(quality)) {
+
+  for (
+    const quality of qualities
+  ) {
+
+    if (
+      value.includes(quality)
+    ) {
       return quality;
     }
+
   }
+
 
   return "";
 }
@@ -148,27 +199,44 @@ function detectQuality(text) {
    ========================================================= */
 
 function detectRating(text) {
-  const value = cleanText(text);
 
-  const matches = value.match(
-    /\b([0-9](?:[.,][0-9])?)\b/g
-  );
+  const value =
+    cleanText(text);
+
+
+  const matches =
+    value.match(
+      /\b([0-9](?:[.,][0-9])?)\b/g
+    );
+
 
   if (!matches) {
     return 0;
   }
 
-  const numbers = matches
-    .map(v =>
-      Number(v.replace(",", "."))
-    )
-    .filter(v => v >= 0 && v <= 10);
+
+  const numbers =
+    matches
+      .map(value =>
+        Number(
+          value.replace(",", ".")
+        )
+      )
+      .filter(
+        value =>
+          value >= 0 &&
+          value <= 10
+      );
+
 
   if (!numbers.length) {
     return 0;
   }
 
-  return numbers[numbers.length - 1];
+
+  return numbers[
+    numbers.length - 1
+  ];
 }
 
 
@@ -177,20 +245,28 @@ function detectRating(text) {
    ========================================================= */
 
 function detectYear(text) {
-  const match = cleanText(text).match(
-    /\b(19|20)\d{2}\b/
-  );
 
-  return match ? match[0] : "";
+  const match =
+    cleanText(text).match(
+      /\b(19|20)\d{2}\b/
+    );
+
+
+  return match
+    ? match[0]
+    : "";
 }
 
 
 /* =========================================================
-   EXTRACTION CARTE FS15
+   EXTRACTION CARTE
    ========================================================= */
 
 function extractCard($, link) {
-  const href = $(link).attr("href");
+
+  const href =
+    $(link).attr("href");
+
 
   if (
     !href ||
@@ -199,13 +275,29 @@ function extractCard($, link) {
     return null;
   }
 
-  const url = absoluteUrl(href);
 
-  let node = $(link);
+  const url =
+    absoluteUrl(href);
 
-  for (let i = 0; i < 6; i++) {
-    const text = cleanText(node.text());
-    const images = node.find("img");
+
+  let node =
+    $(link);
+
+
+  for (
+    let i = 0;
+    i < 6;
+    i++
+  ) {
+
+    const text =
+      cleanText(
+        node.text()
+      );
+
+    const images =
+      node.find("img");
+
 
     if (
       images.length &&
@@ -214,63 +306,111 @@ function extractCard($, link) {
       break;
     }
 
-    node = node.parent();
+
+    node =
+      node.parent();
+
   }
 
-  const text = cleanText(node.text());
 
-  let title = cleanText(
-    $(link).text()
-  );
+  const text =
+    cleanText(
+      node.text()
+    );
+
+
+  let title =
+    cleanText(
+      $(link).text()
+    );
+
 
   if (!title) {
-    const image = node.find("img").first();
 
-    title = cleanText(
-      image.attr("alt")
-    );
+    const image =
+      node.find("img").first();
+
+
+    title =
+      cleanText(
+        image.attr("alt")
+      );
+
   }
+
 
   if (!title) {
     return null;
   }
 
+
   let poster = "";
 
-  const image = node.find("img").first();
+
+  const image =
+    node.find("img").first();
+
 
   if (image.length) {
+
     poster =
       image.attr("data-src") ||
       image.attr("data-lazy-src") ||
       image.attr("src") ||
       "";
+
   }
 
-  poster = absoluteUrl(poster);
+
+  poster =
+    absoluteUrl(poster);
+
+
+  let id = "";
+
+
+  try {
+
+    id =
+      new URL(url)
+        .searchParams
+        .get("newsid") || "";
+
+  } catch {
+
+    return null;
+
+  }
+
 
   return {
-    id: new URL(url)
-      .searchParams
-      .get("newsid"),
+
+    id,
 
     title,
 
-    year: detectYear(text),
+    year:
+      detectYear(text),
 
-    type: "movie",
+    type:
+      "movie",
 
     poster,
 
-    language: detectLanguage(text),
+    language:
+      detectLanguage(text),
 
-    quality: detectQuality(text),
+    quality:
+      detectQuality(text),
 
-    rating: detectRating(text),
+    rating:
+      detectRating(text),
 
-    comments: 0,
+    comments:
+      0,
 
-    views: 0,
+    views:
+      0,
 
     genres: [],
 
@@ -284,7 +424,9 @@ function extractCard($, link) {
 
     url,
 
-    addedAt: new Date().toISOString()
+    addedAt:
+      new Date().toISOString()
+
   };
 }
 
@@ -293,73 +435,104 @@ function extractCard($, link) {
    PARSE LISTING
    ========================================================= */
 
-function parseListing(html, type) {
-  const $ = cheerio.load(html);
+function parseListing(
+  html,
+  type
+) {
+
+  const $ =
+    cheerio.load(html);
+
 
   const results = [];
   const seen = new Set();
 
-  $("a[href*='newsid=']").each(
-    (_index, element) => {
 
-      const item = extractCard(
-        $,
-        element
-      );
+  $("a[href*='newsid=']")
+    .each(
+      (_index, element) => {
 
-      if (!item) {
-        return;
+        const item =
+          extractCard(
+            $,
+            element
+          );
+
+
+        if (!item) {
+          return;
+        }
+
+
+        if (
+          seen.has(item.id)
+        ) {
+          return;
+        }
+
+
+        seen.add(item.id);
+
+
+        item.type =
+          type;
+
+
+        results.push(item);
+
       }
+    );
 
-      if (seen.has(item.id)) {
-        return;
-      }
-
-      seen.add(item.id);
-
-      item.type = type;
-
-      results.push(item);
-    }
-  );
 
   return results;
 }
 
 
 /* =========================================================
-   FICHE FS15
+   FICHE FS23
    ========================================================= */
 
 async function enrichItem(item) {
+
   try {
-    const html = await fetchPage(
-      item.url
-    );
 
-    const $ = cheerio.load(html);
+    const html =
+      await fetchPage(
+        item.url
+      );
 
-    const pageText = cleanText(
-      $("body").text()
-    );
+
+    const $ =
+      cheerio.load(html);
+
+
+    const pageText =
+      cleanText(
+        $("body").text()
+      );
 
 
     /* TITRE */
 
-    const heading = $("h1")
-      .first()
-      .text();
+    const heading =
+      $("h1").first().text();
+
 
     if (heading) {
-      item.title = cleanText(
-        heading
-      );
+
+      item.title =
+        cleanText(
+          heading
+        );
+
     }
 
 
     /* AFFICHE */
 
-    const images = $("img");
+    const images =
+      $("img");
+
 
     for (
       let i = 0;
@@ -373,6 +546,7 @@ async function enrichItem(item) {
         $(images[i]).attr("data-lazy-src") ||
         "";
 
+
       if (
         src &&
         (
@@ -381,98 +555,170 @@ async function enrichItem(item) {
           src.includes("upload")
         )
       ) {
+
         item.poster =
           absoluteUrl(src);
 
         break;
+
       }
+
     }
 
 
     /* VERSION */
 
-    const version = pageText.match(
-      /Version\s*:\s*([^]+?)(?=\s+Qualité|$)/i
-    );
+    const version =
+      pageText.match(
+        /Version\s*:\s*([^]+?)(?=\s+Qualité|$)/i
+      );
+
 
     if (version) {
-      item.language = cleanText(
-        version[1]
-      );
+
+      item.language =
+        cleanText(
+          version[1]
+        );
+
     }
 
 
     /* QUALITE */
 
-    const quality = pageText.match(
-      /Qualité\s*:\s*([^]+)/i
-    );
+    const quality =
+      pageText.match(
+        /Qualité\s*:\s*([^]+)/i
+      );
+
 
     if (quality) {
-      item.quality = cleanText(
-        quality[1]
-      )
-        .split("Date de sortie")[0]
+
+      item.quality =
+        cleanText(
+          quality[1]
+        )
+        .split(
+          "Date de sortie"
+        )[0]
         .trim();
+
     }
 
 
     /* DATE */
 
-    const release = pageText.match(
-      /Date de sortie\s*:\s*([^]+)/i
-    );
+    const release =
+      pageText.match(
+        /Date de sortie\s*:\s*([^]+)/i
+      );
+
 
     if (release) {
-      item.year = detectYear(
-        release[1]
-      );
+
+      item.year =
+        detectYear(
+          release[1]
+        );
+
     }
 
 
     /* GENRES */
 
-    const genre = pageText.match(
-      /Genre\s*:\s*([^]+)/i
-    );
+    const genre =
+      pageText.match(
+        /Genre\s*:\s*([^]+)/i
+      );
+
 
     if (genre) {
-      item.genres = cleanText(
-        genre[1]
-      )
+
+      item.genres =
+        cleanText(
+          genre[1]
+        )
         .split(",")
-        .map(value => value.trim())
+        .map(
+          value =>
+            value.trim()
+        )
         .filter(Boolean);
+
     }
 
 
     /* SYNOPSIS */
 
-    const synopsis =
+    const metaDescription =
       $("meta[name='description']")
         .attr("content");
 
-    if (synopsis) {
-      item.synopsis = cleanText(
-        synopsis
-      );
+
+    if (metaDescription) {
+
+      item.synopsis =
+        cleanText(
+          metaDescription
+        );
+
     }
 
-  } catch (error) {
+
+    /* LANGUE DE SECOURS */
+
+    if (!item.language) {
+
+      item.language =
+        detectLanguage(
+          pageText
+        );
+
+    }
+
+
+    /* QUALITE DE SECOURS */
+
+    if (!item.quality) {
+
+      item.quality =
+        detectQuality(
+          pageText
+        );
+
+    }
+
+
+    /* ANNEE DE SECOURS */
+
+    if (!item.year) {
+
+      item.year =
+        detectYear(
+          pageText
+        );
+
+    }
+
+  }
+
+  catch (error) {
 
     console.error(
-      "Erreur fiche FS15:",
+      "Erreur fiche FS23:",
       item.url,
       error.message
     );
+
   }
+
 
   return item;
 }
 
 
 /* =========================================================
-   ENRICHISSEMENT PAR LOTS
+   ENRICHISSEMENT
    ========================================================= */
 
 async function enrichItems(items) {
@@ -483,26 +729,34 @@ async function enrichItems(items) {
     start += ENRICH_CONCURRENCY
   ) {
 
-    const batch = items.slice(
-      start,
-      start + ENRICH_CONCURRENCY
-    );
+    const batch =
+      items.slice(
+        start,
+        start +
+          ENRICH_CONCURRENCY
+      );
+
 
     await Promise.all(
-      batch.map(item =>
-        enrichItem(item)
+      batch.map(
+        item =>
+          enrichItem(item)
       )
     );
 
+
     console.log(
-      `FS15 enrichissement: ${
+      `FS23 enrichissement: ${
         Math.min(
-          start + batch.length,
+          start +
+            batch.length,
           items.length
         )
       }/${items.length}`
     );
+
   }
+
 
   return items;
 }
@@ -519,6 +773,7 @@ async function collectSource(
 
   const all = [];
 
+
   for (
     let page = 1;
     page <= PAGES;
@@ -530,14 +785,19 @@ async function collectSource(
         ? baseUrl
         : `${baseUrl}&cstart=${page}`;
 
+
     try {
 
       console.log(
-        `FS15 ${type}: page ${page}`
+        `FS23 ${type}: page ${page}`
       );
 
+
       const html =
-        await fetchPage(url);
+        await fetchPage(
+          url
+        );
+
 
       const items =
         parseListing(
@@ -545,46 +805,57 @@ async function collectSource(
           type
         );
 
-      all.push(...items);
 
-    } catch (error) {
+      all.push(
+        ...items
+      );
+
+    }
+
+    catch (error) {
 
       console.error(
-        `FS15 ${type} page ${page}:`,
+        `FS23 ${type} page ${page}:`,
         error.message
       );
+
     }
+
   }
+
 
   return all;
 }
 
 
 /* =========================================================
-   REFRESH COMPLET
+   REFRESH
    ========================================================= */
 
 async function refresh() {
 
   console.log(
-    "Actualisation du catalogue FS15..."
+    "Actualisation du catalogue FS23..."
   );
+
 
   const [
     movies,
     series
-  ] = await Promise.all([
+  ] =
+    await Promise.all([
 
-    collectSource(
-      SOURCES.films,
-      "movie"
-    ),
+      collectSource(
+        SOURCES.films,
+        "movie"
+      ),
 
-    collectSource(
-      SOURCES.series,
-      "series"
-    )
-  ]);
+      collectSource(
+        SOURCES.series,
+        "series"
+      )
+
+    ]);
 
 
   const combined = [
@@ -593,9 +864,13 @@ async function refresh() {
   ];
 
 
-  const unique = new Map();
+  const unique =
+    new Map();
 
-  for (const item of combined) {
+
+  for (
+    const item of combined
+  ) {
 
     if (
       !item.id ||
@@ -604,15 +879,19 @@ async function refresh() {
       continue;
     }
 
+
     unique.set(
       item.id,
       item
     );
+
   }
 
 
   const catalogue =
-    [...unique.values()];
+    [
+      ...unique.values()
+    ];
 
 
   const limited =
@@ -627,13 +906,16 @@ async function refresh() {
   );
 
 
-  cache = limited;
+  cache =
+    limited;
 
-  lastUpdate = Date.now();
+
+  lastUpdate =
+    Date.now();
 
 
   console.log(
-    `FS15: ${cache.length} éléments chargés`
+    `FS23: ${cache.length} éléments chargés`
   );
 
 
@@ -655,7 +937,9 @@ async function getCatalogue() {
   ) {
 
     return cache;
+
   }
+
 
   return refresh();
 }
@@ -669,6 +953,7 @@ module.exports = {
 
   getCatalogue,
 
-  normalize: item => item
+  normalize:
+    item => item
 
 };
