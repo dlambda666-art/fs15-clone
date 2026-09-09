@@ -39,6 +39,34 @@ const SOURCES = {
 
 
 /* =========================================================
+   GENRES PROPRES
+   ========================================================= */
+
+const KNOWN_GENRES = [
+
+  "Action",
+  "Animation",
+  "Aventure",
+  "Comédie",
+  "Crime",
+  "Documentaire",
+  "Drame",
+  "Famille",
+  "Fantastique",
+  "Histoire",
+  "Horreur",
+  "Musique",
+  "Mystère",
+  "Romance",
+  "Science-Fiction",
+  "Thriller",
+  "Guerre",
+  "Western"
+
+];
+
+
+/* =========================================================
    CATALOGUE LOCAL
    ========================================================= */
 
@@ -57,6 +85,10 @@ async function localCatalogue(query = {}) {
   } = query;
 
 
+  /* -------------------------------------------------------
+     TYPE
+     ------------------------------------------------------- */
+
   if (type) {
 
     items =
@@ -68,42 +100,64 @@ async function localCatalogue(query = {}) {
   }
 
 
+  /* -------------------------------------------------------
+     GENRE
+     ------------------------------------------------------- */
+
   if (genre) {
 
     const wanted =
       String(genre)
+        .trim()
         .toLowerCase();
 
     items =
-      items.filter(item =>
-        Array.isArray(item.genres) &&
-        item.genres.some(
+      items.filter(item => {
+
+        if (!Array.isArray(item.genres)) {
+          return false;
+        }
+
+        return item.genres.some(
           g =>
             String(g)
+              .trim()
               .toLowerCase() === wanted
-        )
-      );
+        );
+
+      });
 
   }
 
+
+  /* -------------------------------------------------------
+     LANGUE
+     ------------------------------------------------------- */
 
   if (language) {
 
     const wanted =
       String(language)
+        .trim()
         .toLowerCase();
 
     items =
       items.filter(item =>
+
         String(
           item.language || ""
         )
         .toLowerCase()
         .includes(wanted)
+
       );
 
   }
 
+
+  /* -------------------------------------------------------
+     ANNEE
+     ------------------------------------------------------- */
 
   if (year) {
 
@@ -118,10 +172,15 @@ async function localCatalogue(query = {}) {
   }
 
 
+  /* -------------------------------------------------------
+     RECHERCHE
+     ------------------------------------------------------- */
+
   if (q) {
 
     const search =
       String(q)
+        .trim()
         .toLowerCase();
 
     items =
@@ -145,6 +204,10 @@ async function localCatalogue(query = {}) {
 
   }
 
+
+  /* -------------------------------------------------------
+     TRI
+     ------------------------------------------------------- */
 
   switch (sort) {
 
@@ -191,10 +254,18 @@ async function localCatalogue(query = {}) {
 
       break;
 
+
+    case "new":
+
+    default:
+
+      break;
+
   }
 
 
   return items;
+
 }
 
 
@@ -214,19 +285,28 @@ app.get(
         );
 
       res.json({
+
         items,
-        count: items.length
+
+        count:
+          items.length
+
       });
 
     }
 
     catch (error) {
 
-      console.error(error);
+      console.error(
+        "Erreur catalogue :",
+        error
+      );
 
       res.status(500).json({
+
         error:
           "Erreur catalogue"
+
       });
 
     }
@@ -248,12 +328,6 @@ app.get(
       const page =
         req.params.page;
 
-
-      /*
-       * Pour l'instant les pages
-       * qui peuvent être représentées
-       * directement par notre catalogue.
-       */
 
       const configs = {
 
@@ -296,10 +370,13 @@ app.get(
 
       if (!config) {
 
-        return res.status(404)
+        return res
+          .status(404)
           .json({
+
             error:
               "Page inconnue"
+
           });
 
       }
@@ -311,22 +388,50 @@ app.get(
         );
 
 
+      let source;
+
+
+      if (page === "notes") {
+
+        source =
+          SOURCES.topFilms;
+
+      }
+
+      else if (page === "commentes") {
+
+        source =
+          SOURCES.communityFilms;
+
+      }
+
+      else if (page === "films") {
+
+        source =
+          SOURCES.films;
+
+      }
+
+      else if (page === "series") {
+
+        source =
+          SOURCES.series;
+
+      }
+
+      else {
+
+        source =
+          SOURCES.films;
+
+      }
+
+
       res.json({
 
         page,
 
-        source:
-          SOURCES[
-            page === "notes"
-              ? "topFilms"
-              : page === "commentes"
-                ? "communityFilms"
-                : page === "films"
-                  ? "films"
-                  : page === "series"
-                    ? "series"
-                    : "films"
-          ],
+        source,
 
         items,
 
@@ -339,11 +444,16 @@ app.get(
 
     catch (error) {
 
-      console.error(error);
+      console.error(
+        "Erreur page :",
+        error
+      );
 
       res.status(500).json({
+
         error:
           "Erreur page"
+
       });
 
     }
@@ -362,46 +472,48 @@ app.get(
 
     try {
 
-      const items =
-        await getCatalogue();
-
+      /*
+       * IMPORTANT :
+       * Les genres du menu ne sont PLUS
+       * récupérés depuis les textes de FS23.
+       *
+       * On utilise uniquement notre liste
+       * propre afin d'éviter les commentaires,
+       * URLs, noms de personnes, etc.
+       */
 
       const genres =
-        [
-          ...new Set(
-            items.flatMap(
-              item =>
-                Array.isArray(
-                  item.genres
-                )
-                  ? item.genres
-                  : []
-            )
-          )
-        ]
-        .filter(Boolean)
-        .sort(
-          (a, b) =>
-            a.localeCompare(
-              b,
-              "fr"
-            )
-        );
+        [...KNOWN_GENRES];
+
+
+      /*
+       * Les années restent calculées
+       * depuis le catalogue.
+       */
+
+      const items =
+        await getCatalogue();
 
 
       const years =
         [
           ...new Set(
+
             items
+
               .map(
                 item =>
                   String(
                     item.year || ""
                   )
               )
+
               .filter(Boolean)
+
           )
+
         ]
+
         .sort(
           (a, b) =>
             Number(b) -
@@ -414,15 +526,19 @@ app.get(
         sources: SOURCES,
 
         types: [
+
           "movie",
           "series"
+
         ],
 
         languages: [
+
           "VF",
           "VF+VOSTFR",
           "VOSTFR",
           "VO"
+
         ],
 
         genres,
@@ -435,11 +551,16 @@ app.get(
 
     catch (error) {
 
-      console.error(error);
+      console.error(
+        "Erreur catégories :",
+        error
+      );
 
       res.status(500).json({
+
         error:
           "Erreur catégories"
+
       });
 
     }
@@ -467,8 +588,11 @@ app.get(
       if (!q) {
 
         return res.json({
+
           items: [],
+
           count: 0
+
         });
 
       }
@@ -476,24 +600,37 @@ app.get(
 
       const items =
         await localCatalogue({
-          q
+
+          q,
+
+          sort: "new"
+
         });
 
 
       res.json({
+
         items,
-        count: items.length
+
+        count:
+          items.length
+
       });
 
     }
 
     catch (error) {
 
-      console.error(error);
+      console.error(
+        "Erreur recherche :",
+        error
+      );
 
       res.status(500).json({
+
         error:
           "Erreur recherche"
+
       });
 
     }
@@ -526,10 +663,13 @@ app.get(
 
       if (!item) {
 
-        return res.status(404)
+        return res
+          .status(404)
           .json({
+
             error:
               "Fiche introuvable"
+
           });
 
       }
@@ -541,11 +681,16 @@ app.get(
 
     catch (error) {
 
-      console.error(error);
+      console.error(
+        "Erreur fiche :",
+        error
+      );
 
       res.status(500).json({
+
         error:
           "Erreur fiche"
+
       });
 
     }
@@ -563,8 +708,11 @@ app.get(
   (_req, res) => {
 
     res.json({
+
       base: FS23,
+
       sources: SOURCES
+
     });
 
   }
@@ -580,11 +728,15 @@ app.get(
   (_req, res) => {
 
     res.json({
+
       status: "ok",
+
       service:
         "fs15-clone",
+
       source:
         "fs23.lol"
+
     });
 
   }
