@@ -8,13 +8,20 @@ const genreList = document.getElementById("genreList");
 const loading = document.getElementById("loading");
 const empty = document.getElementById("empty");
 
+
+/* =========================================================
+   ETAT
+   ========================================================= */
+
 let state = {
-  sort: "new"
+  sort: "new",
+  page: 1,
+  perPage: 18
 };
 
 
 /* =========================================================
-   GENRES PROPRES
+   GENRES
    ========================================================= */
 
 const KNOWN_GENRES = [
@@ -73,19 +80,10 @@ async function api(url) {
 
 
 /* =========================================================
-   CHARGEMENT DES CATEGORIES
+   CATEGORIES
    ========================================================= */
 
-async function loadCategories() {
-
-  /*
-   * IMPORTANT :
-   * On ne récupère plus la liste des genres depuis
-   * /api/categories car la source FS23 renvoie parfois
-   * du texte parasite dans cette partie.
-   *
-   * Les genres affichés sont donc notre liste propre.
-   */
+function loadCategories() {
 
   genreList.innerHTML = "";
 
@@ -100,21 +98,20 @@ async function loadCategories() {
     button.textContent =
       genre;
 
-    button.addEventListener(
-      "click",
-      () => {
+    button.addEventListener("click", () => {
 
-        state = {
-          sort: "new",
-          genre: genre
-        };
+      state = {
+        sort: "new",
+        page: 1,
+        perPage: 18,
+        genre: genre
+      };
 
-        closeSideMenu();
+      closeSideMenu();
 
-        loadCatalog();
+      loadCatalog();
 
-      }
-    );
+    });
 
     genreList.appendChild(button);
 
@@ -124,7 +121,7 @@ async function loadCategories() {
 
 
 /* =========================================================
-   CONSTRUCTION DE L'URL
+   URL API
    ========================================================= */
 
 function buildCatalogUrl() {
@@ -134,54 +131,24 @@ function buildCatalogUrl() {
 
 
   if (state.type) {
-
-    params.set(
-      "type",
-      state.type
-    );
-
+    params.set("type", state.type);
   }
-
 
   if (state.language) {
-
-    params.set(
-      "language",
-      state.language
-    );
-
+    params.set("language", state.language);
   }
-
 
   if (state.genre) {
-
-    params.set(
-      "genre",
-      state.genre
-    );
-
+    params.set("genre", state.genre);
   }
-
 
   if (state.q) {
-
-    params.set(
-      "q",
-      state.q
-    );
-
+    params.set("q", state.q);
   }
-
 
   if (state.sort) {
-
-    params.set(
-      "sort",
-      state.sort
-    );
-
+    params.set("sort", state.sort);
   }
-
 
   return `/api/catalog?${params.toString()}`;
 
@@ -206,7 +173,6 @@ function createPoster(item) {
 
   }
 
-
   const image =
     document.createElement("img");
 
@@ -222,15 +188,11 @@ function createPoster(item) {
   image.src =
     item.poster;
 
-
   image.onerror = () => {
 
-    image.removeAttribute(
-      "src"
-    );
+    image.removeAttribute("src");
 
   };
-
 
   return image;
 
@@ -307,19 +269,13 @@ function createCard(item) {
     item.id;
 
 
-  const poster =
-    createPoster(item);
-
   card.appendChild(
-    poster
+    createPoster(item)
   );
 
 
-  const badges =
-    createBadges(item);
-
   card.appendChild(
-    badges
+    createBadges(item)
   );
 
 
@@ -336,9 +292,7 @@ function createCard(item) {
       Number(item.rating)
         .toFixed(1);
 
-  }
-
-  else if (item.year) {
+  } else if (item.year) {
 
     score.textContent =
       item.year;
@@ -346,9 +300,7 @@ function createCard(item) {
   }
 
 
-  card.appendChild(
-    score
-  );
+  card.appendChild(score);
 
 
   const title =
@@ -361,24 +313,325 @@ function createCard(item) {
     item.title ||
     "Sans titre";
 
-  card.appendChild(
-    title
-  );
+  card.appendChild(title);
 
 
   card.addEventListener(
     "click",
-    () => {
+    () => openItem(item.id)
+  );
 
-      openItem(
-        item.id
+
+  return card;
+
+}
+
+
+/* =========================================================
+   PAGINATION
+   ========================================================= */
+
+function createPagination(totalItems) {
+
+  const old =
+    document.getElementById(
+      "pagination"
+    );
+
+  if (old) {
+    old.remove();
+  }
+
+
+  const totalPages =
+    Math.ceil(
+      totalItems /
+      state.perPage
+    );
+
+
+  if (totalPages <= 1) {
+    return;
+  }
+
+
+  const pagination =
+    document.createElement("div");
+
+  pagination.id =
+    "pagination";
+
+
+  pagination.style.display =
+    "flex";
+
+  pagination.style.flexWrap =
+    "wrap";
+
+  pagination.style.justifyContent =
+    "center";
+
+  pagination.style.alignItems =
+    "center";
+
+  pagination.style.gap =
+    "8px";
+
+  pagination.style.padding =
+    "25px 10px 40px";
+
+
+  function addButton(
+    label,
+    page,
+    active = false
+  ) {
+
+    const button =
+      document.createElement("button");
+
+    button.textContent =
+      label;
+
+    button.style.minWidth =
+      "48px";
+
+    button.style.height =
+      "42px";
+
+    button.style.border =
+      "0";
+
+    button.style.borderRadius =
+      "3px";
+
+    button.style.cursor =
+      "pointer";
+
+    button.style.fontSize =
+      "16px";
+
+    button.style.background =
+      active
+        ? "#ff7518"
+        : "#292929";
+
+    button.style.color =
+      "#fff";
+
+
+    if (active) {
+      button.style.fontWeight =
+        "bold";
+    }
+
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        state.page =
+          page;
+
+        renderCurrentPage();
+
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth"
+        });
+
+      }
+    );
+
+
+    pagination.appendChild(
+      button
+    );
+
+  }
+
+
+  /* PRECEDENT */
+
+  if (state.page > 1) {
+
+    addButton(
+      "‹",
+      state.page - 1
+    );
+
+  }
+
+
+  /*
+   * On affiche une fenêtre de pages
+   * pour pouvoir aller très loin :
+   * 1 2 3 4 5 6 ... 50
+   */
+
+  let start =
+    Math.max(
+      1,
+      state.page - 2
+    );
+
+  let end =
+    Math.min(
+      totalPages,
+      state.page + 2
+    );
+
+
+  if (start > 1) {
+
+    addButton(
+      "1",
+      1,
+      state.page === 1
+    );
+
+
+    if (start > 2) {
+
+      const dots =
+        document.createElement(
+          "span"
+        );
+
+      dots.textContent =
+        "…";
+
+      dots.style.color =
+        "#fff";
+
+      dots.style.fontSize =
+        "22px";
+
+      pagination.appendChild(
+        dots
+      );
+
+    }
+
+  }
+
+
+  for (
+    let page = start;
+    page <= end;
+    page++
+  ) {
+
+    addButton(
+      String(page),
+      page,
+      page === state.page
+    );
+
+  }
+
+
+  if (end < totalPages) {
+
+    if (end < totalPages - 1) {
+
+      const dots =
+        document.createElement(
+          "span"
+        );
+
+      dots.textContent =
+        "…";
+
+      dots.style.color =
+        "#fff";
+
+      dots.style.fontSize =
+        "22px";
+
+      pagination.appendChild(
+        dots
+      );
+
+    }
+
+
+    addButton(
+      String(totalPages),
+      totalPages,
+      state.page === totalPages
+    );
+
+  }
+
+
+  /* SUIVANT */
+
+  if (
+    state.page <
+    totalPages
+  ) {
+
+    addButton(
+      "›",
+      state.page + 1
+    );
+
+  }
+
+
+  catalog.parentNode.appendChild(
+    pagination
+  );
+
+}
+
+
+/* =========================================================
+   RENDU DE LA PAGE COURANTE
+   ========================================================= */
+
+let currentItems = [];
+
+
+function renderCurrentPage() {
+
+  catalog.innerHTML = "";
+
+
+  const start =
+    (
+      state.page - 1
+    ) *
+    state.perPage;
+
+
+  const end =
+    start +
+    state.perPage;
+
+
+  const pageItems =
+    currentItems.slice(
+      start,
+      end
+    );
+
+
+  pageItems.forEach(
+    item => {
+
+      catalog.appendChild(
+        createCard(item)
       );
 
     }
   );
 
 
-  return card;
+  createPagination(
+    currentItems.length
+  );
 
 }
 
@@ -396,6 +649,17 @@ async function loadCatalog() {
   empty.classList.add(
     "hidden"
   );
+
+
+  const oldPagination =
+    document.getElementById(
+      "pagination"
+    );
+
+  if (oldPagination) {
+    oldPagination.remove();
+  }
+
 
   catalog.innerHTML =
     "";
@@ -419,6 +683,11 @@ async function loadCatalog() {
       !data.items.length
     ) {
 
+      currentItems = [];
+
+      empty.textContent =
+        "Aucun résultat.";
+
       empty.classList.remove(
         "hidden"
       );
@@ -428,15 +697,40 @@ async function loadCatalog() {
     }
 
 
-    data.items.forEach(
-      item => {
+    /*
+     * IMPORTANT :
+     * Le serveur nous donne toute la liste.
+     * On ne coupe PAS les résultats ici.
+     *
+     * La pagination se fait ensuite
+     * uniquement côté interface.
+     */
 
-        catalog.appendChild(
-          createCard(item)
-        );
+    currentItems =
+      Array.isArray(data.items)
+        ? data.items
+        : [];
 
-      }
-    );
+
+    const totalPages =
+      Math.ceil(
+        currentItems.length /
+        state.perPage
+      );
+
+
+    if (
+      state.page >
+      totalPages
+    ) {
+
+      state.page =
+        totalPages || 1;
+
+    }
+
+
+    renderCurrentPage();
 
 
   }
@@ -507,11 +801,8 @@ function showItem(item) {
       "itemModal"
     );
 
-
   if (old) {
-
     old.remove();
-
   }
 
 
@@ -591,36 +882,20 @@ function showItem(item) {
   const info =
     document.createElement("p");
 
-  const details =
-    [];
+  const details = [];
 
 
   if (item.year) {
-
-    details.push(
-      item.year
-    );
-
+    details.push(item.year);
   }
-
 
   if (item.language) {
-
-    details.push(
-      item.language
-    );
-
+    details.push(item.language);
   }
-
 
   if (item.quality) {
-
-    details.push(
-      item.quality
-    );
-
+    details.push(item.quality);
   }
-
 
   if (item.rating) {
 
@@ -632,9 +907,7 @@ function showItem(item) {
 
 
   info.textContent =
-    details.join(
-      " • "
-    );
+    details.join(" • ");
 
 
   if (item.poster) {
@@ -676,30 +949,18 @@ function showItem(item) {
     "1.6";
 
 
-  box.prepend(
-    close
-  );
+  box.prepend(close);
 
-  box.appendChild(
-    title
-  );
+  box.appendChild(title);
 
-  box.appendChild(
-    info
-  );
+  box.appendChild(info);
 
-  box.appendChild(
-    synopsis
-  );
+  box.appendChild(synopsis);
 
 
-  modal.appendChild(
-    box
-  );
+  modal.appendChild(box);
 
-  document.body.appendChild(
-    modal
-  );
+  document.body.appendChild(modal);
 
 }
 
@@ -709,9 +970,7 @@ function showItem(item) {
    ========================================================= */
 
 document
-  .querySelectorAll(
-    ".nav-button"
-  )
+  .querySelectorAll(".nav-button")
   .forEach(button => {
 
     button.addEventListener(
@@ -719,9 +978,7 @@ document
       () => {
 
         document
-          .querySelectorAll(
-            ".nav-button"
-          )
+          .querySelectorAll(".nav-button")
           .forEach(
             b =>
               b.classList.remove(
@@ -735,44 +992,36 @@ document
         );
 
 
-        state = {};
+        state = {
+          page: 1,
+          perPage: 18
+        };
 
 
         const action =
           button.dataset.action;
 
 
-        if (
-          action === "new"
-        ) {
+        if (action === "new") {
 
           state.sort =
             "new";
 
-        }
-
-
-        else if (
+        } else if (
           action === "rating"
         ) {
 
           state.sort =
             "rating";
 
-        }
-
-
-        else if (
+        } else if (
           action === "comments"
         ) {
 
           state.sort =
             "comments";
 
-        }
-
-
-        else if (
+        } else if (
           action === "views"
         ) {
 
@@ -791,7 +1040,7 @@ document
 
 
 /* =========================================================
-   CATEGORIES DU MENU
+   CATEGORIES FILMS / SERIES / LANGUES
    ========================================================= */
 
 document
@@ -805,13 +1054,13 @@ document
       () => {
 
         state = {
-          sort: "new"
+          sort: "new",
+          page: 1,
+          perPage: 18
         };
 
 
-        if (
-          button.dataset.type
-        ) {
+        if (button.dataset.type) {
 
           state.type =
             button.dataset.type;
@@ -819,9 +1068,7 @@ document
         }
 
 
-        if (
-          button.dataset.language
-        ) {
+        if (button.dataset.language) {
 
           state.language =
             button.dataset.language;
@@ -843,8 +1090,7 @@ document
    RECHERCHE
    ========================================================= */
 
-let searchTimer =
-  null;
+let searchTimer = null;
 
 
 search.addEventListener(
@@ -863,6 +1109,9 @@ search.addEventListener(
           state.q =
             search.value.trim();
 
+          state.page =
+            1;
+
           loadCatalog();
 
         },
@@ -879,7 +1128,7 @@ search.addEventListener(
 
 async function init() {
 
-  await loadCategories();
+  loadCategories();
 
   await loadCatalog();
 
