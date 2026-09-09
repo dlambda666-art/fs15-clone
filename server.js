@@ -1,92 +1,360 @@
 const express = require("express");
 const path = require("path");
 
+const {
+  getCatalogue
+} = require("./src/provider");
+
+
 const app = express();
-const PORT = process.env.PORT || 7860;
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-
-const catalog = [];
-
-function sortNewest(items) {
-  return [...items].sort(
-    (a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0)
+const PORT =
+  Number(
+    process.env.PORT || 7860
   );
-}
 
-app.get("/api/catalog", (req, res) => {
-  let items = catalog;
 
-  const { type, genre, language, q } = req.query;
+app.use(
+  express.json()
+);
+
+
+app.use(
+  express.static(
+    path.join(
+      __dirname,
+      "public"
+    )
+  )
+);
+
+
+/* =====================================================
+   FILTRAGE
+   ===================================================== */
+
+async function filtered(query) {
+
+  let items =
+    await getCatalogue();
+
+
+  const {
+    type,
+    genre,
+    language,
+    q,
+    sort
+  } = query;
+
 
   if (type) {
-    items = items.filter(item => item.type === type);
+
+    items =
+      items.filter(
+        item =>
+          item.type === type
+      );
+
   }
+
 
   if (genre) {
-    items = items.filter(item =>
-      Array.isArray(item.genres) &&
-      item.genres.some(
-        g => g.toLowerCase() === genre.toLowerCase()
-      )
-    );
+
+    items =
+      items.filter(
+        item =>
+          item.genres.some(
+            g =>
+              g.toLowerCase() ===
+              genre.toLowerCase()
+          )
+      );
+
   }
+
 
   if (language) {
-    items = items.filter(item =>
-      String(item.language || "")
-        .toLowerCase()
-        .includes(language.toLowerCase())
-    );
+
+    const wanted =
+      language.toLowerCase();
+
+    items =
+      items.filter(
+        item =>
+          String(
+            item.language
+          )
+            .toLowerCase()
+            .includes(wanted)
+      );
+
   }
+
 
   if (q) {
-    const search = q.toLowerCase();
 
-    items = items.filter(item =>
-      String(item.title || "")
-        .toLowerCase()
-        .includes(search)
-    );
+    const search =
+      q.toLowerCase();
+
+    items =
+      items.filter(
+        item =>
+          item.title
+            .toLowerCase()
+            .includes(search) ||
+
+          item.synopsis
+            .toLowerCase()
+            .includes(search)
+      );
+
   }
 
-  res.json({
-    items: sortNewest(items),
-    count: items.length
-  });
-});
 
-app.get("/api/categories", (_req, res) => {
-  const genres = [
-    ...new Set(
-      catalog.flatMap(item =>
-        Array.isArray(item.genres) ? item.genres : []
-      )
-    )
-  ].sort();
+  switch (sort) {
 
-  res.json({
-    types: ["movie", "series"],
-    languages: ["VF", "VOSTFR", "VF+VOSTFR", "VO"],
-    genres
-  });
-});
+    case "rating":
 
-app.get("/api/item/:id", (req, res) => {
-  const item = catalog.find(
-    entry => String(entry.id) === String(req.params.id)
-  );
+      items.sort(
+        (a, b) =>
+          b.rating -
+          a.rating
+      );
 
-  if (!item) {
-    return res.status(404).json({
-      error: "Fiche introuvable"
+      break;
+
+
+    case "comments":
+
+      items.sort(
+        (a, b) =>
+          b.comments -
+          a.comments
+      );
+
+      break;
+
+
+    case "views":
+
+      items.sort(
+        (a, b) =>
+          b.views -
+          a.views
+      );
+
+      break;
+
+
+    default:
+
+      items.sort(
+        (a, b) =>
+          new Date(
+            b.addedAt
+          ) -
+          new Date(
+            a.addedAt
+          )
+      );
+
+  }
+
+
+  return items;
+
+}
+
+
+/* =====================================================
+   CATALOGUE
+   ===================================================== */
+
+app.get(
+  "/api/catalog",
+  async (req, res) => {
+
+    try {
+
+      const items =
+        await filtered(
+          req.query
+        );
+
+      res.json({
+        items,
+        count:
+          items.length
+      });
+
+    } catch (error) {
+
+      console.error(error);
+
+      res.status(500).json({
+        error:
+          "Erreur catalogue"
+      });
+
+    }
+
+  }
+);
+
+
+/* =====================================================
+   CATEGORIES
+   ===================================================== */
+
+app.get(
+  "/api/categories",
+  async (_req, res) => {
+
+    try {
+
+      const items =
+        await getCatalogue();
+
+
+      res.json({
+
+        types: [
+          "movie",
+          "series"
+        ],
+
+        languages: [
+          "VF",
+          "VF+VOSTFR",
+          "VOSTFR",
+          "VO"
+        ],
+
+        genres: [
+          ...new Set(
+            items.flatMap(
+              item =>
+                item.genres
+            )
+          )
+        ].sort(),
+
+        countries: [
+          ...new Set(
+            items.flatMap(
+              item =>
+                item.country
+            )
+          )
+        ].sort(),
+
+        themes: [
+          ...new Set(
+            items.flatMap(
+              item =>
+                item.themes
+            )
+          )
+        ].sort()
+
+      });
+
+    } catch (error) {
+
+      res.status(500).json({
+        error:
+          "Erreur catégories"
+      });
+
+    }
+
+  }
+);
+
+
+/* =====================================================
+   FICHE
+   ===================================================== */
+
+app.get(
+  "/api/item/:id",
+  async (req, res) => {
+
+    try {
+
+      const items =
+        await getCatalogue();
+
+
+      const item =
+        items.find(
+          entry =>
+            String(
+              entry.id
+            ) ===
+            String(
+              req.params.id
+            )
+        );
+
+
+      if (!item) {
+
+        return res
+          .status(404)
+          .json({
+            error:
+              "Fiche introuvable"
+          });
+
+      }
+
+
+      res.json(item);
+
+    } catch (error) {
+
+      res.status(500).json({
+        error:
+          "Erreur fiche"
+      });
+
+    }
+
+  }
+);
+
+
+/* =====================================================
+   SANTE
+   ===================================================== */
+
+app.get(
+  "/api/health",
+  (_req, res) => {
+
+    res.json({
+      status: "ok",
+      service:
+        "fs15-clone"
     });
+
   }
+);
 
-  res.json(item);
-});
 
-app.listen(PORT, () => {
-  console.log(`FS15 Clone lancé sur le port ${PORT}`);
-});
+/* =====================================================
+   START
+   ===================================================== */
+
+app.listen(
+  PORT,
+  () => {
+
+    console.log(
+      `FS15 Clone lancé sur le port ${PORT}`
+    );
+
+  }
+);
