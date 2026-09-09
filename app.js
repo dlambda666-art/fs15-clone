@@ -11,6 +11,7 @@ const PORT = Number(
   process.env.PORT || 7860
 );
 
+
 /* =========================================================
    INTERFACE WEB
    ========================================================= */
@@ -31,18 +32,60 @@ app.get("/", (_req, res) => {
   );
 });
 
+
 /* =========================================================
    HEALTH
    ========================================================= */
 
 app.get("/health", (_req, res) => {
+
   res.json({
     status: "ok"
   });
+
 });
 
+
 /* =========================================================
-   API CATALOGUE
+   OUTILS PAGINATION
+   ========================================================= */
+
+function getSkip(req) {
+
+  const value =
+    Number(req.query.skip);
+
+  if (
+    Number.isFinite(value) &&
+    value >= 0
+  ) {
+    return Math.floor(value);
+  }
+
+  return 0;
+
+}
+
+
+function getPage(req) {
+
+  const value =
+    Number(req.query.page);
+
+  if (
+    Number.isFinite(value) &&
+    value >= 1
+  ) {
+    return Math.floor(value);
+  }
+
+  return 1;
+
+}
+
+
+/* =========================================================
+   API CATALOGUE WEB
    ========================================================= */
 
 app.get(
@@ -51,13 +94,32 @@ app.get(
 
     try {
 
+      const skip =
+        getSkip(req);
+
+      const page =
+        getPage(req);
+
+
       let items =
         await getCatalogue({
-          type: req.query.type,
-          genre: req.query.genre
+
+          type:
+            req.query.type,
+
+          genre:
+            req.query.genre,
+
+          skip,
+
+          page
+
         });
 
-      /* LANGUE */
+
+      /* =====================================================
+         LANGUE
+         ===================================================== */
 
       if (req.query.language) {
 
@@ -74,9 +136,13 @@ app.get(
               .toUpperCase()
               .includes(language)
           );
+
       }
 
-      /* RECHERCHE */
+
+      /* =====================================================
+         RECHERCHE
+         ===================================================== */
 
       if (req.query.q) {
 
@@ -99,14 +165,21 @@ app.get(
                   .toLowerCase();
 
               return title.includes(q);
+
             });
+
         }
+
       }
 
-      /* TRI */
+
+      /* =====================================================
+         TRI
+         ===================================================== */
 
       const sort =
         req.query.sort || "new";
+
 
       if (sort === "rating") {
 
@@ -116,7 +189,9 @@ app.get(
             Number(a.rating || 0)
         );
 
-      } else if (sort === "comments") {
+      }
+
+      else if (sort === "comments") {
 
         items.sort(
           (a, b) =>
@@ -124,7 +199,9 @@ app.get(
             Number(a.comments || 0)
         );
 
-      } else if (sort === "views") {
+      }
+
+      else if (sort === "views") {
 
         items.sort(
           (a, b) =>
@@ -132,7 +209,9 @@ app.get(
             Number(a.views || 0)
         );
 
-      } else {
+      }
+
+      else {
 
         items.sort(
           (a, b) =>
@@ -144,13 +223,32 @@ app.get(
               )
             )
         );
+
       }
 
+
+      /* =====================================================
+         REPONSE
+         ===================================================== */
+
       res.json({
-        items
+
+        items,
+
+        page,
+
+        skip,
+
+        pageSize: 18,
+
+        hasMore:
+          items.length === 18
+
       });
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.error(
         "Erreur API catalogue :",
@@ -158,12 +256,17 @@ app.get(
       );
 
       res.status(500).json({
+
         error:
           error.message
+
       });
+
     }
+
   }
 );
+
 
 /* =========================================================
    API FICHE
@@ -185,19 +288,26 @@ app.get(
             String(req.params.id)
         );
 
+
       if (!item) {
 
         return res
           .status(404)
           .json({
+
             error:
               "Élément introuvable"
+
           });
+
       }
+
 
       res.json(item);
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.error(
         "Erreur fiche :",
@@ -205,69 +315,159 @@ app.get(
       );
 
       res.status(500).json({
+
         error:
           error.message
+
       });
+
     }
+
   }
 );
+
 
 /* =========================================================
    CATALOGUE STREMIO
    ========================================================= */
 
 app.get(
-  /^\/catalog\/([^/]+)\/([^/]+)$/,
+  /^\/catalog\/([^/]+)\/([^/]+)(?:\/([^/]+))?\/?$/,
   async (req, res) => {
 
     try {
 
+      const type =
+        req.params[0] === "series"
+          ? "series"
+          : "movie";
+
+
+      /*
+       * EXTRA STREMIO
+       *
+       * Exemple :
+       *
+       * genre=Horreur
+       * genre=Horreur&skip=18
+       * genre=Science-Fiction&skip=36
+       */
+
+      const extra =
+        req.params[2] || "";
+
+
+      let genre = "";
+      let skip = 0;
+
+
+      if (extra) {
+
+        const decoded =
+          decodeURIComponent(
+            extra
+          );
+
+
+        const genreMatch =
+          decoded.match(
+            /(?:^|&)genre=([^&]+)/i
+          );
+
+
+        if (genreMatch) {
+
+          genre =
+            decodeURIComponent(
+              genreMatch[1]
+            );
+
+        }
+
+
+        const skipMatch =
+          decoded.match(
+            /(?:^|&)skip=(\d+)/i
+          );
+
+
+        if (skipMatch) {
+
+          skip =
+            Number(
+              skipMatch[1]
+            );
+
+        }
+
+      }
+
+
       const items =
         await getCatalogue({
-          type:
-            req.params[0] ===
-            "series"
-              ? "series"
-              : "movie"
+
+          type,
+
+          genre,
+
+          skip
+
         });
 
+
       res.json({
-        metas: items.map(item => ({
-          id:
-            String(item.id),
 
-          type:
-            item.type,
+        metas:
 
-          name:
-            item.title,
+          items.map(
+            item => ({
 
-          poster:
-            item.poster || undefined,
+              id:
+                String(
+                  item.id
+                ),
 
-          releaseInfo:
-            item.year
-              ? String(item.year)
-              : undefined,
+              type:
+                item.type,
 
-          description:
-            item.synopsis || undefined,
+              name:
+                item.title,
 
-          genres:
-            Array.isArray(
-              item.genres
-            )
-              ? item.genres
-              : [],
+              poster:
+                item.poster ||
+                undefined,
 
-          imdbRating:
-            Number(
-              item.rating || 0
-            ) || undefined
-        }))
+              releaseInfo:
+                item.year
+                  ? String(
+                      item.year
+                    )
+                  : undefined,
+
+              description:
+                item.synopsis ||
+                undefined,
+
+              genres:
+                Array.isArray(
+                  item.genres
+                )
+                  ? item.genres
+                  : [],
+
+              imdbRating:
+                Number(
+                  item.rating || 0
+                ) || undefined
+
+            })
+          )
+
       });
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.error(
         "Erreur catalogue Stremio :",
@@ -275,12 +475,17 @@ app.get(
       );
 
       res.status(500).json({
+
         error:
           error.message
+
       });
+
     }
+
   }
 );
+
 
 /* =========================================================
    DEMARRAGE
