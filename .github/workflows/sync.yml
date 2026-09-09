@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout GitHub
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Push to Hugging Face
         env:
