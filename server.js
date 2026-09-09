@@ -241,28 +241,34 @@ function detectYear(text) {
 
 
 /* =========================================================
-   GENRES AUTORISES
+   GENRES FS23
    ========================================================= */
 
 const KNOWN_GENRES = [
   "Action",
-  "Animation",
   "Aventure",
+  "Animation",
+  "Arts Martiaux",
+  "Biopic",
   "Comédie",
   "Crime",
-  "Documentaire",
   "Drame",
+  "Documentaire",
   "Famille",
   "Fantastique",
-  "Histoire",
-  "Horreur",
-  "Musique",
-  "Mystère",
-  "Romance",
-  "Science-Fiction",
-  "Thriller",
   "Guerre",
-  "Western"
+  "Horreur",
+  "Historique",
+  "Espionnage",
+  "Policier",
+  "Romance",
+  "Science fiction",
+  "Science-Fiction",
+  "Spectacle",
+  "Thriller",
+  "Western",
+  "Mystère",
+  "Musique"
 ];
 
 
@@ -295,7 +301,9 @@ function normalizeGenre(value) {
       genre
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase();
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
 
     if (
       normalized === genreNormalized
@@ -310,12 +318,19 @@ function normalizeGenre(value) {
 
 
 /* =========================================================
-   EXTRACTION GENRES SECURISEE
+   EXTRACTION GENRES
+   =========================================================
+   
+   FS23 utilise réellement :
+
+   Genre: Action, Thriller
+
+   On récupère uniquement cette information.
    ========================================================= */
 
 function extractGenres($) {
 
-  const found = [];
+  const genres = [];
 
   function addGenre(value) {
 
@@ -324,99 +339,26 @@ function extractGenres($) {
 
     if (
       genre &&
-      !found.includes(genre)
+      !genres.includes(genre)
     ) {
-      found.push(genre);
+      genres.push(genre);
     }
 
   }
 
 
   /* -------------------------------------------------------
-     1. Recherche dans les blocs explicitement liés
-        aux genres
+     Recherche exacte du champ Genre:
      ------------------------------------------------------- */
 
-  const genreSelectors = [
-    "[class*='genre']",
-    "[id*='genre']",
-    "[data-genre]",
-    "[data-genres]"
-  ];
-
-
-  $(genreSelectors.join(","))
-    .each((_index, element) => {
-
-      const elementText =
-        cleanText(
-          $(element).text()
-        );
-
-      if (!elementText) {
-        return;
-      }
-
-
-      /* Attributs éventuels */
-
-      const dataGenre =
-        $(element).attr(
-          "data-genre"
-        );
-
-      const dataGenres =
-        $(element).attr(
-          "data-genres"
-        );
-
-
-      if (dataGenre) {
-        addGenre(dataGenre);
-      }
-
-      if (dataGenres) {
-
-        dataGenres
-          .split(/[|,;/]+/)
-          .forEach(addGenre);
-
-      }
-
-
-      /* Texte du bloc */
-
-      elementText
-        .split(/[|,;/]+/)
-        .forEach(part => {
-
-          const value =
-            cleanText(part);
-
-          if (
-            value.length <= 40
-          ) {
-            addGenre(value);
-          }
-
-        });
-
-    });
-
-
-  /* -------------------------------------------------------
-     2. Recherche de lignes "Genre : ..."
-        dans les tableaux / listes de métadonnées
-     ------------------------------------------------------- */
-
-  $("tr, li, p, div, span")
+  $("body")
+    .find("*")
     .each((_index, element) => {
 
       const text =
         cleanText(
           $(element).text()
         );
-
 
       if (!text) {
         return;
@@ -425,7 +367,7 @@ function extractGenres($) {
 
       const match =
         text.match(
-          /^Genres?\s*:\s*(.+)$/i
+          /^Genre\s*:\s*(.+)$/i
         );
 
 
@@ -435,39 +377,45 @@ function extractGenres($) {
 
 
       match[1]
-        .split(/[|,;/]+/)
-        .forEach(part => {
-
-          addGenre(part);
-
-        });
+        .split(/\s*,\s*/)
+        .forEach(addGenre);
 
     });
 
 
   /* -------------------------------------------------------
-     3. Vérification des liens/badges de genre
+     Deuxième méthode : recherche dans le texte brut.
+     Cela permet de fonctionner même si le HTML de FS23
+     change légèrement.
      ------------------------------------------------------- */
 
-  $("a, button, .badge, .label, .tag")
-    .each((_index, element) => {
+  if (!genres.length) {
 
-      const text =
-        cleanText(
-          $(element).text()
-        );
+    const bodyText =
+      cleanText(
+        $("body").text()
+      );
 
-      if (!text) {
-        return;
-      }
 
-      addGenre(text);
+    const match =
+      bodyText.match(
+        /(?:^|\s)Genre\s*:\s*([^]+?)(?=\s+Réalisateur\s*:|\s+Acteurs?\s*:|\s+Version\s*:)/i
+      );
 
-    });
+
+    if (match) {
+
+      match[1]
+        .split(/\s*,\s*/)
+        .forEach(addGenre);
+
+    }
+
+  }
 
 
   return [
-    ...new Set(found)
+    ...new Set(genres)
   ];
 }
 
@@ -714,13 +662,6 @@ async function enrichItem(item) {
       cheerio.load(html);
 
 
-    /* =====================================================
-       IMPORTANT :
-       On garde le body uniquement pour les secours
-       texte général.
-       Les genres NE SONT PLUS recherchés dans le body.
-       ===================================================== */
-
     const pageText =
       cleanText(
         $("body").text()
@@ -897,6 +838,17 @@ async function enrichItem(item) {
         );
 
     }
+
+
+    /* =====================================================
+       DEBUG GENRES
+       ===================================================== */
+
+    console.log(
+      `FS23 genres: ${item.title} -> ${
+        item.genres.join(", ") || "aucun"
+      }`
+    );
 
   }
 
