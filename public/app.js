@@ -8,10 +8,41 @@ const genreList = document.getElementById("genreList");
 const loading = document.getElementById("loading");
 const empty = document.getElementById("empty");
 
+
+/* =========================================================
+   ETAT
+   ========================================================= */
+
 let state = {
   page: "nouveautes",
   sort: "new"
 };
+
+
+/* =========================================================
+   GENRES PROPRES
+   ========================================================= */
+
+const KNOWN_GENRES = [
+  "Action",
+  "Animation",
+  "Aventure",
+  "Comédie",
+  "Crime",
+  "Documentaire",
+  "Drame",
+  "Famille",
+  "Fantastique",
+  "Histoire",
+  "Horreur",
+  "Musique",
+  "Mystère",
+  "Romance",
+  "Science-Fiction",
+  "Thriller",
+  "Guerre",
+  "Western"
+];
 
 
 /* =========================================================
@@ -53,48 +84,59 @@ async function api(url) {
 
 async function loadCategories() {
 
+  /*
+   * Les genres sont volontairement construits
+   * depuis notre liste propre.
+   *
+   * On NE fait plus confiance aux genres renvoyés
+   * par FS23 afin d'éviter commentaires, URLs,
+   * noms de personnes ou autres textes parasites.
+   */
+
+  genreList.innerHTML = "";
+
+  KNOWN_GENRES.forEach(genre => {
+
+    const button =
+      document.createElement("button");
+
+    button.className =
+      "category-button";
+
+    button.textContent =
+      genre;
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        state = {
+          page: null,
+          sort: "new",
+          genre: genre
+        };
+
+        closeSideMenu();
+
+        loadCatalog();
+
+      }
+    );
+
+    genreList.appendChild(button);
+
+  });
+
+
+  /*
+   * On appelle quand même l'API afin de conserver
+   * le comportement général et de vérifier que
+   * l'endpoint fonctionne.
+   */
+
   try {
 
-    const data =
-      await api("/api/categories");
-
-    genreList.innerHTML = "";
-
-    if (!Array.isArray(data.genres)) {
-      return;
-    }
-
-    data.genres.forEach(genre => {
-
-      const button =
-        document.createElement("button");
-
-      button.className =
-        "category-button";
-
-      button.textContent =
-        genre;
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          state = {
-            sort: "new",
-            page: null,
-            genre: genre
-          };
-
-          closeSideMenu();
-
-          loadCatalog();
-
-        }
-      );
-
-      genreList.appendChild(button);
-
-    });
+    await api("/api/categories");
 
   } catch (error) {
 
@@ -113,12 +155,6 @@ async function loadCategories() {
    ========================================================= */
 
 function buildCatalogUrl() {
-
-  /*
-   * Les pages principales utilisent
-   * maintenant les routes dédiées
-   * du serveur.
-   */
 
   if (state.page) {
 
@@ -159,13 +195,9 @@ function buildCatalogUrl() {
     return query
       ? `/api/page/${encodeURIComponent(state.page)}?${query}`
       : `/api/page/${encodeURIComponent(state.page)}`;
+
   }
 
-
-  /*
-   * Filtres classiques :
-   * genre, langue, recherche...
-   */
 
   const params =
     new URLSearchParams();
@@ -244,9 +276,7 @@ function createPoster(item) {
 
   image.onerror = () => {
 
-    image.removeAttribute(
-      "src"
-    );
+    image.removeAttribute("src");
 
   };
 
@@ -323,19 +353,13 @@ function createCard(item) {
     item.id;
 
 
-  const poster =
-    createPoster(item);
-
   card.appendChild(
-    poster
+    createPoster(item)
   );
 
 
-  const badges =
-    createBadges(item);
-
   card.appendChild(
-    badges
+    createBadges(item)
   );
 
 
@@ -352,9 +376,7 @@ function createCard(item) {
       Number(item.rating)
         .toFixed(1);
 
-  }
-
-  else if (item.year) {
+  } else if (item.year) {
 
     score.textContent =
       item.year;
@@ -608,20 +630,17 @@ function showItem(item) {
     );
   }
 
-
   if (item.language) {
     details.push(
       item.language
     );
   }
 
-
   if (item.quality) {
     details.push(
       item.quality
     );
   }
-
 
   if (item.rating) {
 
@@ -750,7 +769,6 @@ document
 
         }
 
-
         else if (
           action === "rating"
         ) {
@@ -759,7 +777,6 @@ document
             "notes";
 
         }
-
 
         else if (
           action === "comments"
@@ -770,7 +787,6 @@ document
 
         }
 
-
         else if (
           action === "views"
         ) {
@@ -780,7 +796,6 @@ document
 
         }
 
-
         else if (
           action === "films"
         ) {
@@ -789,7 +804,6 @@ document
             "films";
 
         }
-
 
         else if (
           action === "series"
@@ -811,7 +825,7 @@ document
 
 
 /* =========================================================
-   CATEGORIES DU MENU
+   CATEGORIES STATIQUES
    ========================================================= */
 
 document
@@ -865,7 +879,8 @@ document
    RECHERCHE
    ========================================================= */
 
-let searchTimer = null;
+let searchTimer =
+  null;
 
 search.addEventListener(
   "input",
