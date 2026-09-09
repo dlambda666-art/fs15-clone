@@ -1,23 +1,27 @@
 const express = require("express");
 const path = require("path");
-
-const {
-  getCatalogue
-} = require("./server.js");
+const { getCatalogue } = require("./server.js");
 
 const app = express();
 
-const PORT = Number(
-  process.env.PORT || 7860
+const PORT = Number(process.env.PORT || 7860);
+const PAGE_SIZE = Number(process.env.FS15_PAGE_SIZE || 18);
+
+const FRENCH_POSTER_BASE = String(
+  process.env.FRENCH_POSTER_BASE ||
+  "https://lambda666-french-poster.hf.space"
+).replace(/\/$/, "");
+
+const POSTER_CACHE_MS = Number(
+  process.env.FS15_POSTER_CACHE_MS || 600000
 );
 
-const PAGE_SIZE = Number(
-  process.env.FS15_PAGE_SIZE || 18
-);
+const posterCache = new Map();
+const posterInflight = new Map();
 
 
 /* =========================================================
-   INTERFACE WEB
+   WEB
    ========================================================= */
 
 app.use(
@@ -36,117 +40,304 @@ app.get("/", (_req, res) => {
   );
 });
 
-
-/* =========================================================
-   HEALTH
-   ========================================================= */
-
 app.get("/health", (_req, res) => {
   res.json({
-    status: "ok"
+    ok: true,
+    service: "FS15 Clone"
   });
 });
 
 
 /* =========================================================
-   API CATALOGUE WEB
+   IMDb
+   ========================================================= */
+
+async function getImdbId(item) {
+
+  if (!item) {
+    return "";
+  }
+
+  for (
+    const value of [
+      item.imdb,
+      item.imdbId,
+      item.imdb_id
+    ]
+  ) {
+
+    const match =
+      String(value || "")
+        .match(/tt\d{7,10}/i);
+
+    if (match) {
+      return match[0].toLowerCase();
+    }
+  }
+
+  if (!item.url) {
+    return "";
+  }
+
+  try {
+
+    const response =
+      await fetch(
+        item.url,
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+            "Accept":
+              "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language":
+              "fr-FR,fr;q=0.9,en;q=0.8"
+          },
+          signal:
+            AbortSignal.timeout(12000)
+        }
+      );
+
+    if (!response.ok) {
+      return "";
+    }
+
+    const html =
+      await response.text();
+
+    const match =
+      html.match(
+        /tt\d{7,10}/i
+      );
+
+    return match
+      ? match[0].toLowerCase()
+      : "";
+
+  } catch (error) {
+
+    console.log(
+      `[FS15] IMDb ${item.id}: ${error.message}`
+    );
+
+    return "";
+  }
+}
+
+
+/* =========================================================
+   FRENCH POSTER
+   =========================================================
+
+   IMPORTANT :
+
+   On appelle :
+
+   /poster/ttXXXXXXXX.svg
+
+   et PAS directement /vf.svg ou /vostfr.svg.
+
+   C'est French Poster qui regarde la fiche FS23
+   et détermine automatiquement :
+
+   VF
+   VOSTFR
+   VF + VOSTFR
+
+   Donc le mécanisme s'applique à chaque affiche.
+   ========================================================= */
+
+async function resolvePoster(item) {
+
+  const fallback =
+    item?.poster || "";
+
+  if (!item) {
+    return fallback;
+  }
+
+  const key =
+    String(
+      item.id ||
+      item.title ||
+      ""
+    );
+
+  const cached =
+    posterCache.get(key);
+
+  if (
+    cached &&
+    Date.now() - cached.time <
+      POSTER_CACHE_MS
+  ) {
+
+    return cached.url;
+  }
+
+  if (
+    posterInflight.has(key)
+  ) {
+
+    return posterInflight.get(key);
+  }
+
+
+  const promise =
+    (async () => {
+
+      const imdbId =
+        await getImdbId(item);
+
+      if (!imdbId) {
+
+        posterCache.set(
+          key,
+          {
+            time: Date.now(),
+            url: fallback
+          }
+        );
+
+        return fallback;
+      }
+
+
+      const posterUrl =
+        `${FRENCH_POSTER_BASE}/poster/${imdbId}.svg?v=fs15`;
+
+
+      posterCache.set(
+        key,
+        {
+          time: Date.now(),
+          url: posterUrl
+        }
+      );
+
+      return posterUrl;
+
+    })()
+    .finally(
+      () =>
+        posterInflight.delete(key)
+    );
+
+
+  posterInflight.set(
+    key,
+    promise
+  );
+
+  return promise;
+}
+
+
+async function withFrenchPosters(
+  items
+) {
+
+  return Promise.all(
+    items.map(
+      async item => ({
+        ...item,
+        poster:
+          await resolvePoster(item)
+      })
+    )
+  );
+}
+
+
+/* =========================================================
+   API CATALOGUE
    ========================================================= */
 
 app.get(
   "/api/catalog",
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
 
     try {
 
-      const page = Math.max(
-        1,
-        Number(req.query.page || 1)
-      );
+      const page =
+        Math.max(
+          1,
+          Number(
+            req.query.page || 1
+          )
+        );
 
       const offset =
-        (page - 1) * PAGE_SIZE;
+        (page - 1) *
+        PAGE_SIZE;
+
 
       let items =
         await getCatalogue({
-          type: req.query.type,
-          genre: req.query.genre,
-          limit: PAGE_SIZE,
-          offset
+
+          type:
+            req.query.type,
+
+          genre:
+            req.query.genre,
+
+          language:
+            req.query.language,
+
+          q:
+            req.query.q
+
         });
 
 
-      /* LANGUE */
-
-      if (req.query.language) {
-
-        const language =
-          String(
-            req.query.language
-          ).toUpperCase();
-
-        items =
-          items.filter(item =>
-            String(
-              item.language || ""
-            )
-              .toUpperCase()
-              .includes(language)
-          );
-      }
-
-
-      /* RECHERCHE */
-
-      if (req.query.q) {
-
-        const q =
-          String(
-            req.query.q
-          )
-            .trim()
-            .toLowerCase();
-
-        if (q) {
-
-          items =
-            items.filter(item =>
-              String(
-                item.title || ""
-              )
-                .toLowerCase()
-                .includes(q)
-            );
-        }
-      }
-
-
-      /* TRI */
-
       const sort =
-        req.query.sort || "new";
+        req.query.sort ||
+        "new";
 
-      if (sort === "rating") {
+
+      if (
+        sort === "rating"
+      ) {
 
         items.sort(
           (a, b) =>
-            Number(b.rating || 0) -
-            Number(a.rating || 0)
+            Number(
+              b.rating || 0
+            ) -
+            Number(
+              a.rating || 0
+            )
         );
 
-      } else if (sort === "comments") {
+      } else if (
+        sort === "comments"
+      ) {
 
         items.sort(
           (a, b) =>
-            Number(b.comments || 0) -
-            Number(a.comments || 0)
+            Number(
+              b.comments || 0
+            ) -
+            Number(
+              a.comments || 0
+            )
         );
 
-      } else if (sort === "views") {
+      } else if (
+        sort === "views"
+      ) {
 
         items.sort(
           (a, b) =>
-            Number(b.views || 0) -
-            Number(a.views || 0)
+            Number(
+              b.views || 0
+            ) -
+            Number(
+              a.views || 0
+            )
         );
 
       } else {
@@ -164,10 +355,34 @@ app.get(
       }
 
 
+      const total =
+        items.length;
+
+
+      items =
+        items.slice(
+          offset,
+          offset + PAGE_SIZE
+        );
+
+
+      items =
+        await withFrenchPosters(
+          items
+        );
+
+
       res.json({
+
         page,
-        pageSize: PAGE_SIZE,
+
+        pageSize:
+          PAGE_SIZE,
+
+        total,
+
         items
+
       });
 
     } catch (error) {
@@ -187,26 +402,31 @@ app.get(
 
 
 /* =========================================================
-   API FICHE
+   FICHE
    ========================================================= */
 
 app.get(
   "/api/item/:id",
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
 
     try {
 
       const items =
-        await getCatalogue({
-          limit: 0
-        });
+        await getCatalogue({});
+
 
       const item =
         items.find(
-          entry =>
-            String(entry.id) ===
-            String(req.params.id)
+          x =>
+            String(x.id) ===
+            String(
+              req.params.id
+            )
         );
+
 
       if (!item) {
 
@@ -218,7 +438,18 @@ app.get(
           });
       }
 
-      res.json(item);
+
+      const [
+        enriched
+      ] =
+        await withFrenchPosters(
+          [item]
+        );
+
+
+      res.json(
+        enriched
+      );
 
     } catch (error) {
 
@@ -237,12 +468,15 @@ app.get(
 
 
 /* =========================================================
-   CATALOGUE STREMIO
+   STREMIO
    ========================================================= */
 
 app.get(
   /^\/catalog\/([^/]+)\/([^/]+)$/,
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
 
     try {
 
@@ -252,11 +486,6 @@ app.get(
           ? "series"
           : "movie";
 
-
-      /*
-       * Stremio utilise skip
-       * pour demander les pages suivantes.
-       */
 
       const skip =
         Math.max(
@@ -271,80 +500,90 @@ app.get(
         req.query.genre ||
         undefined;
 
-      const pageSize =
-        PAGE_SIZE;
 
-
-      const items =
+      let items =
         await getCatalogue({
+
           type,
-          genre,
-          limit: pageSize,
-          offset: skip
+
+          genre
+
         });
+
+
+      items =
+        items.slice(
+          skip,
+          skip + PAGE_SIZE
+        );
+
+
+      items =
+        await withFrenchPosters(
+          items
+        );
 
 
       res.json({
 
         metas:
-          items.map(item => ({
 
-            id:
-              String(item.id),
+          items.map(
+            item => ({
 
-            type:
-              item.type,
+              id:
+                String(
+                  item.id
+                ),
 
-            name:
-              item.title,
+              type:
+                item.type,
 
-            poster:
-              item.poster ||
-              undefined,
+              name:
+                item.title,
 
-            releaseInfo:
-              item.year
-                ? String(item.year)
-                : undefined,
+              poster:
+                item.poster ||
+                undefined,
 
-            description:
-              item.synopsis ||
-              undefined,
+              releaseInfo:
+                item.year
+                  ? String(
+                      item.year
+                    )
+                  : undefined,
 
-            genres:
-              Array.isArray(
-                item.genres
-              )
-                ? item.genres
-                : [],
+              description:
+                item.synopsis ||
+                undefined,
 
+              genres:
+                Array.isArray(
+                  item.genres
+                )
+                  ? item.genres
+                  : [],
 
-            /*
-             * =================================================
-             * FS15 → STREMIO
-             * =================================================
-             *
-             * Ces deux champs viennent directement
-             * du moteur FS15.
-             */
+              language:
+                item.language ||
+                undefined,
 
-            language:
-              item.language ||
-              undefined,
+              tags:
+                [
+                  item.language,
+                  item.quality
+                ].filter(
+                  Boolean
+                ),
 
-            tags:
-              [
-                item.language,
-                item.quality
-              ].filter(Boolean),
+              imdbRating:
+                Number(
+                  item.rating || 0
+                ) ||
+                undefined
 
-
-            imdbRating:
-              Number(
-                item.rating || 0
-              ) || undefined
-
-          }))
+            })
+          )
 
       });
 
@@ -365,7 +604,7 @@ app.get(
 
 
 /* =========================================================
-   DEMARRAGE
+   START
    ========================================================= */
 
 app.listen(
@@ -378,7 +617,7 @@ app.listen(
     );
 
     console.log(
-      `FS15 : ${PAGE_SIZE} éléments par page`
+      `French Poster : ${FRENCH_POSTER_BASE}`
     );
 
   }
