@@ -8,13 +8,7 @@ const genreList = document.getElementById("genreList");
 const loading = document.getElementById("loading");
 const empty = document.getElementById("empty");
 
-
-/* =========================================================
-   ETAT
-   ========================================================= */
-
 let state = {
-  page: "nouveautes",
   sort: "new"
 };
 
@@ -85,12 +79,12 @@ async function api(url) {
 async function loadCategories() {
 
   /*
-   * Les genres sont volontairement construits
-   * depuis notre liste propre.
+   * IMPORTANT :
+   * On ne récupère plus la liste des genres depuis
+   * /api/categories car la source FS23 renvoie parfois
+   * du texte parasite dans cette partie.
    *
-   * On NE fait plus confiance aux genres renvoyés
-   * par FS23 afin d'éviter commentaires, URLs,
-   * noms de personnes ou autres textes parasites.
+   * Les genres affichés sont donc notre liste propre.
    */
 
   genreList.innerHTML = "";
@@ -111,7 +105,6 @@ async function loadCategories() {
       () => {
 
         state = {
-          page: null,
           sort: "new",
           genre: genre
         };
@@ -127,26 +120,6 @@ async function loadCategories() {
 
   });
 
-
-  /*
-   * On appelle quand même l'API afin de conserver
-   * le comportement général et de vérifier que
-   * l'endpoint fonctionne.
-   */
-
-  try {
-
-    await api("/api/categories");
-
-  } catch (error) {
-
-    console.error(
-      "Impossible de charger les catégories :",
-      error
-    );
-
-  }
-
 }
 
 
@@ -156,88 +129,62 @@ async function loadCategories() {
 
 function buildCatalogUrl() {
 
-  if (state.page) {
-
-    const params =
-      new URLSearchParams();
-
-    if (state.type) {
-      params.set(
-        "type",
-        state.type
-      );
-    }
-
-    if (state.language) {
-      params.set(
-        "language",
-        state.language
-      );
-    }
-
-    if (state.genre) {
-      params.set(
-        "genre",
-        state.genre
-      );
-    }
-
-    if (state.q) {
-      params.set(
-        "q",
-        state.q
-      );
-    }
-
-    const query =
-      params.toString();
-
-    return query
-      ? `/api/page/${encodeURIComponent(state.page)}?${query}`
-      : `/api/page/${encodeURIComponent(state.page)}`;
-
-  }
-
-
   const params =
     new URLSearchParams();
 
+
   if (state.type) {
+
     params.set(
       "type",
       state.type
     );
+
   }
 
+
   if (state.language) {
+
     params.set(
       "language",
       state.language
     );
+
   }
 
+
   if (state.genre) {
+
     params.set(
       "genre",
       state.genre
     );
+
   }
 
+
   if (state.q) {
+
     params.set(
       "q",
       state.q
     );
+
   }
 
+
   if (state.sort) {
+
     params.set(
       "sort",
       state.sort
     );
+
   }
 
+
   return `/api/catalog?${params.toString()}`;
+
 }
 
 
@@ -259,6 +206,7 @@ function createPoster(item) {
 
   }
 
+
   const image =
     document.createElement("img");
 
@@ -274,13 +222,18 @@ function createPoster(item) {
   image.src =
     item.poster;
 
+
   image.onerror = () => {
 
-    image.removeAttribute("src");
+    image.removeAttribute(
+      "src"
+    );
 
   };
 
+
   return image;
+
 }
 
 
@@ -334,6 +287,7 @@ function createBadges(item) {
 
 
   return container;
+
 }
 
 
@@ -353,13 +307,19 @@ function createCard(item) {
     item.id;
 
 
+  const poster =
+    createPoster(item);
+
   card.appendChild(
-    createPoster(item)
+    poster
   );
 
 
+  const badges =
+    createBadges(item);
+
   card.appendChild(
-    createBadges(item)
+    badges
   );
 
 
@@ -376,7 +336,9 @@ function createCard(item) {
       Number(item.rating)
         .toFixed(1);
 
-  } else if (item.year) {
+  }
+
+  else if (item.year) {
 
     score.textContent =
       item.year;
@@ -417,6 +379,7 @@ function createCard(item) {
 
 
   return card;
+
 }
 
 
@@ -456,9 +419,6 @@ async function loadCatalog() {
       !data.items.length
     ) {
 
-      empty.textContent =
-        "Aucun résultat.";
-
       empty.classList.remove(
         "hidden"
       );
@@ -479,19 +439,24 @@ async function loadCatalog() {
     );
 
 
-  } catch (error) {
+  }
+
+  catch (error) {
 
     console.error(
       "Erreur catalogue :",
       error
     );
 
+
     loading.classList.add(
       "hidden"
     );
 
+
     empty.textContent =
       "Impossible de charger le catalogue.";
+
 
     empty.classList.remove(
       "hidden"
@@ -517,7 +482,9 @@ async function openItem(id) {
 
     showItem(item);
 
-  } catch (error) {
+  }
+
+  catch (error) {
 
     console.error(
       "Erreur fiche :",
@@ -540,8 +507,11 @@ function showItem(item) {
       "itemModal"
     );
 
+
   if (old) {
+
     old.remove();
+
   }
 
 
@@ -604,6 +574,7 @@ function showItem(item) {
   close.style.fontSize =
     "36px";
 
+
   close.addEventListener(
     "click",
     () => modal.remove()
@@ -625,22 +596,31 @@ function showItem(item) {
 
 
   if (item.year) {
+
     details.push(
       item.year
     );
+
   }
 
+
   if (item.language) {
+
     details.push(
       item.language
     );
+
   }
 
+
   if (item.quality) {
+
     details.push(
       item.quality
     );
+
   }
+
 
   if (item.rating) {
 
@@ -677,6 +657,7 @@ function showItem(item) {
     poster.style.margin =
       "20px auto";
 
+
     box.appendChild(
       poster
     );
@@ -710,6 +691,7 @@ function showItem(item) {
   box.appendChild(
     synopsis
   );
+
 
   modal.appendChild(
     box
@@ -753,64 +735,49 @@ document
         );
 
 
-        state = {
-          sort: "new"
-        };
+        state = {};
 
 
         const action =
           button.dataset.action;
 
 
-        if (action === "new") {
+        if (
+          action === "new"
+        ) {
 
-          state.page =
-            "nouveautes";
+          state.sort =
+            "new";
 
         }
+
 
         else if (
           action === "rating"
         ) {
 
-          state.page =
-            "notes";
+          state.sort =
+            "rating";
 
         }
+
 
         else if (
           action === "comments"
         ) {
 
-          state.page =
-            "commentes";
+          state.sort =
+            "comments";
 
         }
+
 
         else if (
           action === "views"
         ) {
 
-          state.page =
-            "regardes";
-
-        }
-
-        else if (
-          action === "films"
-        ) {
-
-          state.page =
-            "films";
-
-        }
-
-        else if (
-          action === "series"
-        ) {
-
-          state.page =
-            "series";
+          state.sort =
+            "views";
 
         }
 
@@ -818,14 +785,13 @@ document
         loadCatalog();
 
       }
-
     );
 
   });
 
 
 /* =========================================================
-   CATEGORIES STATIQUES
+   CATEGORIES DU MENU
    ========================================================= */
 
 document
@@ -839,8 +805,7 @@ document
       () => {
 
         state = {
-          sort: "new",
-          page: null
+          sort: "new"
         };
 
 
@@ -869,7 +834,6 @@ document
         loadCatalog();
 
       }
-
     );
 
   });
@@ -881,6 +845,7 @@ document
 
 let searchTimer =
   null;
+
 
 search.addEventListener(
   "input",
@@ -894,12 +859,6 @@ search.addEventListener(
     searchTimer =
       setTimeout(
         () => {
-
-          state.page =
-            null;
-
-          state.sort =
-            "new";
 
           state.q =
             search.value.trim();
@@ -925,5 +884,6 @@ async function init() {
   await loadCatalog();
 
 }
+
 
 init();
