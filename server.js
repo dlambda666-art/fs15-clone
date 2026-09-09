@@ -4,17 +4,43 @@ const path = require("path");
 const { getCatalogue } = require("./src/provider");
 
 const app = express();
-const PORT = Number(process.env.PORT || 7860);
+
+const PORT = Number(
+  process.env.PORT || 7860
+);
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+
+const PUBLIC_DIR =
+  path.join(__dirname, "public");
+
+app.use(
+  express.static(PUBLIC_DIR)
+);
+
+
+/* =========================================================
+   PAGE D'ACCUEIL
+   ========================================================= */
+
+app.get("/", (_req, res) => {
+
+  res.sendFile(
+    path.join(
+      PUBLIC_DIR,
+      "index.html"
+    )
+  );
+
+});
 
 
 /* =========================================================
    FS23
    ========================================================= */
 
-const FS23 = "https://fs23.lol";
+const FS23 =
+  "https://fs23.lol";
 
 
 /* =========================================================
@@ -75,6 +101,7 @@ async function localCatalogue(query = {}) {
   let items =
     [...await getCatalogue()];
 
+
   const {
     type,
     genre,
@@ -111,12 +138,20 @@ async function localCatalogue(query = {}) {
         .trim()
         .toLowerCase();
 
+
     items =
       items.filter(item => {
 
-        if (!Array.isArray(item.genres)) {
+        if (
+          !Array.isArray(
+            item.genres
+          )
+        ) {
+
           return false;
+
         }
+
 
         return item.genres.some(
           g =>
@@ -141,16 +176,23 @@ async function localCatalogue(query = {}) {
         .trim()
         .toLowerCase();
 
+
     items =
-      items.filter(item =>
+      items.filter(item => {
 
-        String(
-          item.language || ""
-        )
-        .toLowerCase()
-        .includes(wanted)
+        const value =
+          String(
+            item.language || ""
+          )
+          .trim()
+          .toLowerCase();
 
-      );
+
+        return value.includes(
+          wanted
+        );
+
+      });
 
   }
 
@@ -166,7 +208,8 @@ async function localCatalogue(query = {}) {
         item =>
           String(
             item.year || ""
-          ) === String(year)
+          ) ===
+          String(year)
       );
 
   }
@@ -183,24 +226,30 @@ async function localCatalogue(query = {}) {
         .trim()
         .toLowerCase();
 
+
     items =
-      items.filter(item =>
+      items.filter(item => {
 
-        String(
-          item.title || ""
-        )
-        .toLowerCase()
-        .includes(search)
+        const title =
+          String(
+            item.title || ""
+          )
+          .toLowerCase();
 
-        ||
 
-        String(
-          item.synopsis || ""
-        )
-        .toLowerCase()
-        .includes(search)
+        const synopsis =
+          String(
+            item.synopsis || ""
+          )
+          .toLowerCase();
 
-      );
+
+        return (
+          title.includes(search) ||
+          synopsis.includes(search)
+        );
+
+      });
 
   }
 
@@ -215,8 +264,12 @@ async function localCatalogue(query = {}) {
 
       items.sort(
         (a, b) =>
-          Number(b.rating || 0) -
-          Number(a.rating || 0)
+          Number(
+            b.rating || 0
+          ) -
+          Number(
+            a.rating || 0
+          )
       );
 
       break;
@@ -226,8 +279,12 @@ async function localCatalogue(query = {}) {
 
       items.sort(
         (a, b) =>
-          Number(b.comments || 0) -
-          Number(a.comments || 0)
+          Number(
+            b.comments || 0
+          ) -
+          Number(
+            a.comments || 0
+          )
       );
 
       break;
@@ -237,8 +294,12 @@ async function localCatalogue(query = {}) {
 
       items.sort(
         (a, b) =>
-          Number(b.views || 0) -
-          Number(a.views || 0)
+          Number(
+            b.views || 0
+          ) -
+          Number(
+            a.views || 0
+          )
       );
 
       break;
@@ -248,8 +309,12 @@ async function localCatalogue(query = {}) {
 
       items.sort(
         (a, b) =>
-          Number(b.year || 0) -
-          Number(a.year || 0)
+          Number(
+            b.year || 0
+          ) -
+          Number(
+            a.year || 0
+          )
       );
 
       break;
@@ -270,7 +335,7 @@ async function localCatalogue(query = {}) {
 
 
 /* =========================================================
-   CATALOGUE
+   API CATALOGUE
    ========================================================= */
 
 app.get(
@@ -283,6 +348,7 @@ app.get(
         await localCatalogue(
           req.query
         );
+
 
       res.json({
 
@@ -302,12 +368,15 @@ app.get(
         error
       );
 
-      res.status(500).json({
 
-        error:
-          "Erreur catalogue"
+      res
+        .status(500)
+        .json({
 
-      });
+          error:
+            "Erreur catalogue"
+
+        });
 
     }
 
@@ -332,33 +401,45 @@ app.get(
       const configs = {
 
         nouveautes: {
+
           type: null,
           sort: "new"
+
         },
 
         films: {
+
           type: "movie",
           sort: "new"
+
         },
 
         series: {
+
           type: "series",
           sort: "new"
+
         },
 
         notes: {
+
           type: "movie",
           sort: "rating"
+
         },
 
         commentes: {
+
           type: "movie",
           sort: "comments"
+
         },
 
         regardes: {
+
           type: "movie",
           sort: "views"
+
         }
 
       };
@@ -391,28 +472,36 @@ app.get(
       let source;
 
 
-      if (page === "notes") {
+      if (
+        page === "notes"
+      ) {
 
         source =
           SOURCES.topFilms;
 
       }
 
-      else if (page === "commentes") {
+      else if (
+        page === "commentes"
+      ) {
 
         source =
           SOURCES.communityFilms;
 
       }
 
-      else if (page === "films") {
+      else if (
+        page === "films"
+      ) {
 
         source =
           SOURCES.films;
 
       }
 
-      else if (page === "series") {
+      else if (
+        page === "series"
+      ) {
 
         source =
           SOURCES.series;
@@ -449,12 +538,15 @@ app.get(
         error
       );
 
-      res.status(500).json({
 
-        error:
-          "Erreur page"
+      res
+        .status(500)
+        .json({
 
-      });
+          error:
+            "Erreur page"
+
+        });
 
     }
 
@@ -473,57 +565,50 @@ app.get(
     try {
 
       /*
-       * IMPORTANT :
-       * Les genres du menu ne sont PLUS
-       * récupérés depuis les textes de FS23.
+       * GENRES FIXES ET PROPRES
        *
-       * On utilise uniquement notre liste
-       * propre afin d'éviter les commentaires,
-       * URLs, noms de personnes, etc.
+       * On ne lit surtout plus les genres
+       * directement dans le texte FS23.
        */
 
       const genres =
         [...KNOWN_GENRES];
 
 
-      /*
-       * Les années restent calculées
-       * depuis le catalogue.
-       */
-
       const items =
         await getCatalogue();
 
 
-      const years =
-        [
-          ...new Set(
+      const years = [
 
-            items
+        ...new Set(
 
-              .map(
-                item =>
-                  String(
-                    item.year || ""
-                  )
-              )
+          items
 
-              .filter(Boolean)
+            .map(
+              item =>
+                String(
+                  item.year || ""
+                )
+            )
 
-          )
+            .filter(Boolean)
 
-        ]
+        )
 
-        .sort(
-          (a, b) =>
-            Number(b) -
-            Number(a)
-        );
+      ]
+
+      .sort(
+        (a, b) =>
+          Number(b) -
+          Number(a)
+      );
 
 
       res.json({
 
-        sources: SOURCES,
+        sources:
+          SOURCES,
 
         types: [
 
@@ -556,12 +641,15 @@ app.get(
         error
       );
 
-      res.status(500).json({
 
-        error:
-          "Erreur catégories"
+      res
+        .status(500)
+        .json({
 
-      });
+          error:
+            "Erreur catégories"
+
+        });
 
     }
 
@@ -582,7 +670,8 @@ app.get(
       const q =
         String(
           req.query.q || ""
-        ).trim();
+        )
+        .trim();
 
 
       if (!q) {
@@ -626,12 +715,15 @@ app.get(
         error
       );
 
-      res.status(500).json({
 
-        error:
-          "Erreur recherche"
+      res
+        .status(500)
+        .json({
 
-      });
+          error:
+            "Erreur recherche"
+
+        });
 
     }
 
@@ -656,8 +748,12 @@ app.get(
       const item =
         items.find(
           entry =>
-            String(entry.id) ===
-            String(req.params.id)
+            String(
+              entry.id
+            ) ===
+            String(
+              req.params.id
+            )
         );
 
 
@@ -686,12 +782,15 @@ app.get(
         error
       );
 
-      res.status(500).json({
 
-        error:
-          "Erreur fiche"
+      res
+        .status(500)
+        .json({
 
-      });
+          error:
+            "Erreur fiche"
+
+        });
 
     }
 
@@ -709,9 +808,11 @@ app.get(
 
     res.json({
 
-      base: FS23,
+      base:
+        FS23,
 
-      sources: SOURCES
+      sources:
+        SOURCES
 
     });
 
@@ -729,7 +830,8 @@ app.get(
 
     res.json({
 
-      status: "ok",
+      status:
+        "ok",
 
       service:
         "fs15-clone",
@@ -744,7 +846,7 @@ app.get(
 
 
 /* =========================================================
-   START
+   DEMARRAGE
    ========================================================= */
 
 app.listen(
@@ -752,7 +854,7 @@ app.listen(
   () => {
 
     console.log(
-      `FS23 Clone lancé sur le port ${PORT}`
+      `FS15 Clone lancé sur le port ${PORT}`
     );
 
   }
