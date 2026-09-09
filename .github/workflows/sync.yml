@@ -1,0 +1,24 @@
+name: Sync to Hugging Face
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitHub
+        uses: actions/checkout@v4
+
+      - name: Push to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+          git remote add hf https://lambda666:${HF_TOKEN}@huggingface.co/spaces/lambda666/fs15-clone
+          git push hf main --force
