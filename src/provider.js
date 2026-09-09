@@ -1,4 +1,4 @@
-const cheerio = require("cheerio");
+lliureconst cheerio = require("cheerio");
 
 const BASE_URL = "https://fs23.lol";
 
@@ -624,27 +624,51 @@ async function enrichItem(item) {
     }
 
 
-        /* GENRES */
+        /* =========================================================
+   GENRES
+   ========================================================= */
 
-    const genre = pageText.match(
-      /Genre\s*:\s*(.*?)(?=\s+(?:Réalisateur|Acteurs|Créateur|Créatrice|Version|Qualité|Date de sortie|Langue d'origine|Budget du Film|Image|Ajouté par)\s*:|$)/i
-    );
+const KNOWN_GENRES = [
+  "Action",
+  "Animation",
+  "Aventure",
+  "Comédie",
+  "Crime",
+  "Documentaire",
+  "Drame",
+  "Famille",
+  "Fantastique",
+  "Histoire",
+  "Horreur",
+  "Musique",
+  "Mystère",
+  "Romance",
+  "Science-Fiction",
+  "Thriller",
+  "Guerre",
+  "Western"
+];
 
-    if (genre) {
+const detectedGenres = [];
 
-      item.genres = cleanText(
-        genre[1]
-      )
-        .split(",")
-        .map(value =>
-          value.trim()
-        )
-        .filter(value =>
-          value.length > 0 &&
-          value.length < 40
-        );
+for (const genreName of KNOWN_GENRES) {
 
-    }
+  const pattern = new RegExp(
+    `(?:^|[^a-zà-ÿ])${genreName.replace(
+      /[-/\\^$*+?.()|[\]{}]/g,
+      "\\$&"
+    )}(?:$|[^a-zà-ÿ])`,
+    "i"
+  );
+
+  if (pattern.test(pageText)) {
+    detectedGenres.push(genreName);
+  }
+}
+
+item.genres = [
+  ...new Set(detectedGenres)
+];
 
 
     /* LANGUE DE SECOURS */
