@@ -624,42 +624,24 @@ async function enrichItem(item) {
     }
 
 
-    /* GENRES */
+        /* GENRES */
 
-    const genre =
-      pageText.match(
-        /Genre\s*:\s*([^]+)/i
-      );
-
+    const genre = pageText.match(
+      /Genre\s*:\s*(.*?)(?=\s+(?:Réalisateur|Acteurs|Créateur|Créatrice|Version|Qualité|Date de sortie|Langue d'origine|Budget du Film|Image|Ajouté par)\s*:|$)/i
+    );
 
     if (genre) {
 
-      item.genres =
-        cleanText(
-          genre[1]
-        )
+      item.genres = cleanText(
+        genre[1]
+      )
         .split(",")
-        .map(
-          value =>
-            value.trim()
+        .map(value =>
+          value.trim()
         )
-        .filter(Boolean);
-
-    }
-
-
-    /* SYNOPSIS */
-
-    const metaDescription =
-      $("meta[name='description']")
-        .attr("content");
-
-
-    if (metaDescription) {
-
-      item.synopsis =
-        cleanText(
-          metaDescription
+        .filter(value =>
+          value.length > 0 &&
+          value.length < 40
         );
 
     }
