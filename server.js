@@ -7,21 +7,11 @@ const SOURCES = {
   series: `${BASE_URL}/index.php?category=s-tv&do=cat`
 };
 
-const PAGES = Number(
-  process.env.FS15_PAGES || 8
-);
-
-const REFRESH_MS = Number(
-  process.env.FS15_REFRESH_MS || 600000
-);
-
-const MAX_RESULTS = Number(
-  process.env.FS15_MAX_RESULTS || 80
-);
-
-const ENRICH_CONCURRENCY = Number(
-  process.env.FS15_ENRICH_CONCURRENCY || 6
-);
+const PAGES = Number(process.env.FS15_PAGES || 8);
+const REFRESH_MS = Number(process.env.FS15_REFRESH_MS || 600000);
+const MAX_RESULTS = Number(process.env.FS15_MAX_RESULTS || 80);
+const ENRICH_CONCURRENCY = Number(process.env.FS15_ENRICH_CONCURRENCY || 6);
+const PAGE_SIZE = 18;
 
 let cache = [];
 let lastUpdate = 0;
@@ -78,7 +68,6 @@ function absoluteUrl(url) {
     return "";
   }
 
-
   if (
     url.startsWith("http://") ||
     url.startsWith("https://")
@@ -86,16 +75,13 @@ function absoluteUrl(url) {
     return url;
   }
 
-
   if (url.startsWith("//")) {
     return "https:" + url;
   }
 
-
   if (url.startsWith("/")) {
     return BASE_URL + url;
   }
-
 
   return BASE_URL + "/" + url;
 
@@ -124,20 +110,17 @@ function detectLanguage(text) {
   const value =
     cleanText(text).toUpperCase();
 
-
   if (
     value.includes("VF+VOSTFR")
   ) {
     return "VF+VOSTFR";
   }
 
-
   if (
     value.includes("VOSTFR")
   ) {
     return "VOSTFR";
   }
-
 
   if (
     /\bVF\b/.test(value) ||
@@ -148,13 +131,11 @@ function detectLanguage(text) {
     return "VF";
   }
 
-
   if (
     /\bVO\b/.test(value)
   ) {
     return "VO";
   }
-
 
   return "";
 
@@ -169,7 +150,6 @@ function detectQuality(text) {
 
   const value =
     cleanText(text).toUpperCase();
-
 
   const qualities = [
 
@@ -197,7 +177,6 @@ function detectQuality(text) {
 
   ];
 
-
   for (
     const quality of qualities
   ) {
@@ -210,7 +189,6 @@ function detectQuality(text) {
 
   }
 
-
   return "";
 
 }
@@ -222,20 +200,14 @@ function detectQuality(text) {
 
 function detectRating(text) {
 
-  const value =
-    cleanText(text);
-
-
   const matches =
-    value.match(
+    cleanText(text).match(
       /\b([0-9](?:[.,][0-9])?)\b/g
     );
-
 
   if (!matches) {
     return 0;
   }
-
 
   const numbers =
     matches
@@ -250,11 +222,9 @@ function detectRating(text) {
           value <= 10
       );
 
-
   if (!numbers.length) {
     return 0;
   }
-
 
   return numbers[
     numbers.length - 1
@@ -273,7 +243,6 @@ function detectYear(text) {
     cleanText(text).match(
       /\b(19|20)\d{2}\b/
     );
-
 
   return match
     ? match[0]
@@ -336,36 +305,27 @@ function normalizeGenre(value) {
   const text =
     cleanText(value);
 
-
   if (!text) {
     return "";
   }
 
-
   const normalized =
     text
-
       .normalize("NFD")
-
       .replace(
         /[\u0300-\u036f]/g,
         ""
       )
-
       .toLowerCase()
-
       .replace(
         /[-_]+/g,
         " "
       )
-
       .replace(
         /\s+/g,
         " "
       )
-
       .trim();
-
 
   const aliases = {
 
@@ -373,9 +333,6 @@ function normalizeGenre(value) {
       "Science-Fiction",
 
     "science-fiction":
-      "Science-Fiction",
-
-    "science  fiction":
       "Science-Fiction",
 
     "tele realite":
@@ -389,7 +346,6 @@ function normalizeGenre(value) {
 
   };
 
-
   if (
     aliases[normalized]
   ) {
@@ -400,35 +356,27 @@ function normalizeGenre(value) {
 
   }
 
-
   for (
     const genre of KNOWN_GENRES
   ) {
 
     const genreNormalized =
       genre
-
         .normalize("NFD")
-
         .replace(
           /[\u0300-\u036f]/g,
           ""
         )
-
         .toLowerCase()
-
         .replace(
           /[-_]+/g,
           " "
         )
-
         .replace(
           /\s+/g,
           " "
         )
-
         .trim();
-
 
     if (
       normalized ===
@@ -444,13 +392,11 @@ function normalizeGenre(value) {
 
       }
 
-
       return genre;
 
     }
 
   }
-
 
   return "";
 
@@ -471,7 +417,6 @@ function extractGenres($) {
     const genre =
       normalizeGenre(value);
 
-
     if (
       genre &&
       !genres.includes(genre)
@@ -484,10 +429,6 @@ function extractGenres($) {
   }
 
 
-  /* -------------------------------------------------------
-     1. BLOCS GENRE
-     ------------------------------------------------------- */
-
   $(
     "[class*='genre'], [id*='genre'], [data-genre], [data-genres]"
   )
@@ -499,12 +440,10 @@ function extractGenres($) {
             $(element).text()
           );
 
-
         const dataGenre =
           $(element).attr(
             "data-genre"
           );
-
 
         const dataGenres =
           $(element).attr(
@@ -545,7 +484,6 @@ function extractGenres($) {
               /Genres?\s*:\s*(.+)$/i
             );
 
-
           if (match) {
 
             match[1]
@@ -564,10 +502,6 @@ function extractGenres($) {
     );
 
 
-  /* -------------------------------------------------------
-     2. LIGNES "GENRE :"
-     ------------------------------------------------------- */
-
   $(
     "tr, li, p, div, span"
   )
@@ -579,22 +513,18 @@ function extractGenres($) {
             $(element).text()
           );
 
-
         if (!text) {
           return;
         }
-
 
         const match =
           text.match(
             /^Genres?\s*:\s*(.+)$/i
           );
 
-
         if (!match) {
           return;
         }
-
 
         match[1]
           .split(
@@ -608,10 +538,6 @@ function extractGenres($) {
     );
 
 
-  /* -------------------------------------------------------
-     3. SECOURS BODY
-     ------------------------------------------------------- */
-
   if (!genres.length) {
 
     const bodyText =
@@ -619,14 +545,10 @@ function extractGenres($) {
         $("body").text()
       );
 
-
     const match =
       bodyText.match(
-
         /(?:^|\s)Genres?\s*:\s*([^]+?)(?=\s+Réalisateur\s*:|\s+Acteurs?\s*:|\s+Version\s*:|\s+Qualité\s*:)/i
-
       );
-
 
     if (match) {
 
@@ -665,7 +587,6 @@ function extractCard(
   const href =
     $(link).attr("href");
 
-
   if (
     !href ||
     !href.includes("newsid=")
@@ -675,10 +596,8 @@ function extractCard(
 
   }
 
-
   const url =
     absoluteUrl(href);
-
 
   let node =
     $(link);
@@ -695,10 +614,8 @@ function extractCard(
         node.text()
       );
 
-
     const images =
       node.find("img");
-
 
     if (
       images.length &&
@@ -708,7 +625,6 @@ function extractCard(
       break;
 
     }
-
 
     node =
       node.parent();
@@ -721,7 +637,6 @@ function extractCard(
       node.text()
     );
 
-
   let title =
     cleanText(
       $(link).text()
@@ -730,17 +645,12 @@ function extractCard(
 
   if (!title) {
 
-    const image =
-      node.find(
-        "img"
-      ).first();
-
-
     title =
       cleanText(
-        image.attr(
-          "alt"
-        )
+        node
+          .find("img")
+          .first()
+          .attr("alt")
       );
 
   }
@@ -751,38 +661,18 @@ function extractCard(
   }
 
 
-  let poster = "";
-
-
   const image =
-    node.find(
-      "img"
-    ).first();
+    node
+      .find("img")
+      .first();
 
 
-  if (image.length) {
-
-    poster =
-      image.attr(
-        "data-src"
-      ) ||
-
-      image.attr(
-        "data-lazy-src"
-      ) ||
-
-      image.attr(
-        "src"
-      ) ||
-
-      "";
-
-  }
-
-
-  poster =
+  const poster =
     absoluteUrl(
-      poster
+      image.attr("data-src") ||
+      image.attr("data-lazy-src") ||
+      image.attr("src") ||
+      ""
     );
 
 
@@ -872,7 +762,6 @@ function parseListing(
       html
     );
 
-
   const results = [];
 
   const seen =
@@ -890,11 +779,9 @@ function parseListing(
             type
           );
 
-
         if (!item) {
           return;
         }
-
 
         if (
           seen.has(
@@ -906,11 +793,9 @@ function parseListing(
 
         }
 
-
         seen.add(
           item.id
         );
-
 
         results.push(
           item
@@ -940,20 +825,16 @@ async function enrichItem(
         item.url
       );
 
-
     const $ =
       cheerio.load(
         html
       );
-
 
     const pageText =
       cleanText(
         $("body").text()
       );
 
-
-    /* TITRE */
 
     const heading =
       $("h1")
@@ -971,8 +852,6 @@ async function enrichItem(
     }
 
 
-    /* POSTER */
-
     const images =
       $("img");
 
@@ -984,20 +863,10 @@ async function enrichItem(
     ) {
 
       const src =
-        $(images[i]).attr(
-          "src"
-        ) ||
-
-        $(images[i]).attr(
-          "data-src"
-        ) ||
-
-        $(images[i]).attr(
-          "data-lazy-src"
-        ) ||
-
+        $(images[i]).attr("src") ||
+        $(images[i]).attr("data-src") ||
+        $(images[i]).attr("data-lazy-src") ||
         "";
-
 
       if (
         src &&
@@ -1020,8 +889,6 @@ async function enrichItem(
     }
 
 
-    /* VERSION */
-
     const version =
       pageText.match(
         /Version\s*:\s*([^]+?)(?=\s+Qualité|$)/i
@@ -1037,8 +904,6 @@ async function enrichItem(
 
     }
 
-
-    /* QUALITE */
 
     const quality =
       pageText.match(
@@ -1060,8 +925,6 @@ async function enrichItem(
     }
 
 
-    /* DATE */
-
     const release =
       pageText.match(
         /Date de sortie\s*:\s*([^]+)/i
@@ -1078,15 +941,11 @@ async function enrichItem(
     }
 
 
-    /* GENRES */
-
     item.genres =
       extractGenres(
         $
       );
 
-
-    /* SECOURS LANGUE */
 
     if (!item.language) {
 
@@ -1098,8 +957,6 @@ async function enrichItem(
     }
 
 
-    /* SECOURS QUALITE */
-
     if (!item.quality) {
 
       item.quality =
@@ -1109,8 +966,6 @@ async function enrichItem(
 
     }
 
-
-    /* SECOURS ANNEE */
 
     if (!item.year) {
 
@@ -1128,7 +983,6 @@ async function enrichItem(
         "aucun"
       }`
     );
-
 
   }
   catch (error) {
@@ -1211,7 +1065,8 @@ async function enrichItems(
 
 async function loadSource(
   source,
-  type
+  type,
+  pages = PAGES
 ) {
 
   const all = [];
@@ -1219,16 +1074,11 @@ async function loadSource(
 
   for (
     let page = 1;
-    page <= PAGES;
+    page <= pages;
     page++
   ) {
 
     try {
-
-      /*
-       * FS23 utilise cstart pour sa pagination.
-       * Page 1 = URL de base.
-       */
 
       const url =
         page === 1
@@ -1237,7 +1087,7 @@ async function loadSource(
 
 
       console.log(
-        `FS23 ${type}: page ${page}/${PAGES}`
+        `FS23 ${type}: page ${page}/${pages}`
       );
 
 
@@ -1263,11 +1113,6 @@ async function loadSource(
         ...items
       );
 
-
-      /*
-       * Si une page est vide,
-       * on arrête la pagination.
-       */
 
       if (
         !items.length
@@ -1325,20 +1170,15 @@ async function refreshCache() {
     ]);
 
 
-  const combined = [
-    ...films,
-    ...series
-  ];
-
-
-  /* DEDUPLICATION */
-
   const unique =
     new Map();
 
 
   for (
-    const item of combined
+    const item of [
+      ...films,
+      ...series
+    ]
   ) {
 
     if (
@@ -1351,7 +1191,6 @@ async function refreshCache() {
       continue;
 
     }
-
 
     unique.set(
       item.id,
@@ -1371,21 +1210,6 @@ async function refreshCache() {
     `FS15 : ${catalogue.length} éléments uniques avant enrichissement`
   );
 
-
-  /*
-   * IMPORTANT :
-   *
-   * On enrichit TOUT le catalogue.
-   *
-   * On ne fait PLUS :
-   *
-   * catalogue.slice(0, 80)
-   *
-   * avant le cache.
-   *
-   * Cela permet aux genres de fonctionner
-   * sur toutes les pages.
-   */
 
   cache =
     await enrichItems(
@@ -1519,20 +1343,80 @@ async function getCatalogue(
 
 
   /*
-   * IMPORTANT :
-   * La limite de 80 est appliquée
-   * SEULEMENT après les filtres.
+   * PAGINATION
+   *
+   * 18 éléments par page,
+   * comme FS23.
+   *
+   * offset = position de départ
+   * limit  = nombre d'éléments
    */
 
   if (
-    MAX_RESULTS > 0
+    options.offset !== undefined
   ) {
 
-    result =
-      result.slice(
+    const offset =
+      Math.max(
         0,
-        MAX_RESULTS
+        Number(
+          options.offset
+        ) || 0
       );
+
+
+    const limit =
+      options.limit !== undefined
+        ? Math.max(
+            0,
+            Number(
+              options.limit
+            ) || 0
+          )
+        : PAGE_SIZE;
+
+
+    if (
+      limit > 0
+    ) {
+
+      result =
+        result.slice(
+          offset,
+          offset +
+            limit
+        );
+
+    }
+    else {
+
+      result =
+        result.slice(
+          offset
+        );
+
+    }
+
+  }
+
+  else {
+
+    /*
+     * Compatibilité avec
+     * l'ancienne interface.
+     */
+
+    if (
+      MAX_RESULTS > 0
+    ) {
+
+      result =
+        result.slice(
+          0,
+          MAX_RESULTS
+        );
+
+    }
 
   }
 
