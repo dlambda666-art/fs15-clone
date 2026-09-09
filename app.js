@@ -11,6 +11,9 @@ const PORT = Number(
   process.env.PORT || 7860
 );
 
+const PAGE_SIZE = Number(
+  process.env.FS15_PAGE_SIZE || 18
+);
 
 /* =========================================================
    INTERFACE WEB
@@ -32,57 +35,15 @@ app.get("/", (_req, res) => {
   );
 });
 
-
 /* =========================================================
    HEALTH
    ========================================================= */
 
 app.get("/health", (_req, res) => {
-
   res.json({
     status: "ok"
   });
-
 });
-
-
-/* =========================================================
-   OUTILS PAGINATION
-   ========================================================= */
-
-function getSkip(req) {
-
-  const value =
-    Number(req.query.skip);
-
-  if (
-    Number.isFinite(value) &&
-    value >= 0
-  ) {
-    return Math.floor(value);
-  }
-
-  return 0;
-
-}
-
-
-function getPage(req) {
-
-  const value =
-    Number(req.query.page);
-
-  if (
-    Number.isFinite(value) &&
-    value >= 1
-  ) {
-    return Math.floor(value);
-  }
-
-  return 1;
-
-}
-
 
 /* =========================================================
    API CATALOGUE WEB
@@ -94,32 +55,23 @@ app.get(
 
     try {
 
-      const skip =
-        getSkip(req);
+      const page = Math.max(
+        1,
+        Number(req.query.page || 1)
+      );
 
-      const page =
-        getPage(req);
-
+      const offset =
+        (page - 1) * PAGE_SIZE;
 
       let items =
         await getCatalogue({
-
-          type:
-            req.query.type,
-
-          genre:
-            req.query.genre,
-
-          skip,
-
-          page
-
+          type: req.query.type,
+          genre: req.query.genre,
+          limit: PAGE_SIZE,
+          offset
         });
 
-
-      /* =====================================================
-         LANGUE
-         ===================================================== */
+      /* LANGUE */
 
       if (req.query.language) {
 
@@ -136,13 +88,9 @@ app.get(
               .toUpperCase()
               .includes(language)
           );
-
       }
 
-
-      /* =====================================================
-         RECHERCHE
-         ===================================================== */
+      /* RECHERCHE */
 
       if (req.query.q) {
 
@@ -156,30 +104,20 @@ app.get(
         if (q) {
 
           items =
-            items.filter(item => {
-
-              const title =
-                String(
-                  item.title || ""
-                )
-                  .toLowerCase();
-
-              return title.includes(q);
-
-            });
-
+            items.filter(item =>
+              String(
+                item.title || ""
+              )
+                .toLowerCase()
+                .includes(q)
+            );
         }
-
       }
 
-
-      /* =====================================================
-         TRI
-         ===================================================== */
+      /* TRI */
 
       const sort =
         req.query.sort || "new";
-
 
       if (sort === "rating") {
 
@@ -189,9 +127,7 @@ app.get(
             Number(a.rating || 0)
         );
 
-      }
-
-      else if (sort === "comments") {
+      } else if (sort === "comments") {
 
         items.sort(
           (a, b) =>
@@ -199,9 +135,7 @@ app.get(
             Number(a.comments || 0)
         );
 
-      }
-
-      else if (sort === "views") {
+      } else if (sort === "views") {
 
         items.sort(
           (a, b) =>
@@ -209,9 +143,7 @@ app.get(
             Number(a.views || 0)
         );
 
-      }
-
-      else {
+      } else {
 
         items.sort(
           (a, b) =>
@@ -223,32 +155,15 @@ app.get(
               )
             )
         );
-
       }
 
-
-      /* =====================================================
-         REPONSE
-         ===================================================== */
-
       res.json({
-
-        items,
-
         page,
-
-        skip,
-
-        pageSize: 18,
-
-        hasMore:
-          items.length === 18
-
+        pageSize: PAGE_SIZE,
+        items
       });
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
       console.error(
         "Erreur API catalogue :",
@@ -256,17 +171,12 @@ app.get(
       );
 
       res.status(500).json({
-
         error:
           error.message
-
       });
-
     }
-
   }
 );
-
 
 /* =========================================================
    API FICHE
@@ -279,7 +189,9 @@ app.get(
     try {
 
       const items =
-        await getCatalogue();
+        await getCatalogue({
+          limit: 0
+        });
 
       const item =
         items.find(
@@ -288,26 +200,19 @@ app.get(
             String(req.params.id)
         );
 
-
       if (!item) {
 
         return res
           .status(404)
           .json({
-
             error:
               "Élément introuvable"
-
           });
-
       }
-
 
       res.json(item);
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
       console.error(
         "Erreur fiche :",
@@ -315,159 +220,101 @@ app.get(
       );
 
       res.status(500).json({
-
         error:
           error.message
-
       });
-
     }
-
   }
 );
-
 
 /* =========================================================
    CATALOGUE STREMIO
    ========================================================= */
 
 app.get(
-  /^\/catalog\/([^/]+)\/([^/]+)(?:\/([^/]+))?\/?$/,
+  /^\/catalog\/([^/]+)\/([^/]+)$/,
   async (req, res) => {
 
     try {
 
       const type =
-        req.params[0] === "series"
+        req.params[0] ===
+        "series"
           ? "series"
           : "movie";
 
-
       /*
-       * EXTRA STREMIO
-       *
-       * Exemple :
-       *
-       * genre=Horreur
-       * genre=Horreur&skip=18
-       * genre=Science-Fiction&skip=36
+       * Stremio envoie généralement
+       * skip pour demander la page suivante.
        */
 
-      const extra =
-        req.params[2] || "";
+      const skip =
+        Math.max(
+          0,
+          Number(
+            req.query.skip || 0
+          )
+        );
 
+      const genre =
+        req.query.genre ||
+        undefined;
 
-      let genre = "";
-      let skip = 0;
-
-
-      if (extra) {
-
-        const decoded =
-          decodeURIComponent(
-            extra
-          );
-
-
-        const genreMatch =
-          decoded.match(
-            /(?:^|&)genre=([^&]+)/i
-          );
-
-
-        if (genreMatch) {
-
-          genre =
-            decodeURIComponent(
-              genreMatch[1]
-            );
-
-        }
-
-
-        const skipMatch =
-          decoded.match(
-            /(?:^|&)skip=(\d+)/i
-          );
-
-
-        if (skipMatch) {
-
-          skip =
-            Number(
-              skipMatch[1]
-            );
-
-        }
-
-      }
-
+      const pageSize =
+        PAGE_SIZE;
 
       const items =
         await getCatalogue({
-
           type,
-
           genre,
-
-          skip
-
+          limit: pageSize,
+          offset: skip
         });
-
 
       res.json({
 
         metas:
+          items.map(item => ({
 
-          items.map(
-            item => ({
+            id:
+              String(item.id),
 
-              id:
-                String(
-                  item.id
-                ),
+            type:
+              item.type,
 
-              type:
-                item.type,
+            name:
+              item.title,
 
-              name:
-                item.title,
+            poster:
+              item.poster ||
+              undefined,
 
-              poster:
-                item.poster ||
-                undefined,
+            releaseInfo:
+              item.year
+                ? String(item.year)
+                : undefined,
 
-              releaseInfo:
-                item.year
-                  ? String(
-                      item.year
-                    )
-                  : undefined,
+            description:
+              item.synopsis ||
+              undefined,
 
-              description:
-                item.synopsis ||
-                undefined,
+            genres:
+              Array.isArray(
+                item.genres
+              )
+                ? item.genres
+                : [],
 
-              genres:
-                Array.isArray(
-                  item.genres
-                )
-                  ? item.genres
-                  : [],
+            imdbRating:
+              Number(
+                item.rating || 0
+              ) || undefined
 
-              imdbRating:
-                Number(
-                  item.rating || 0
-                ) || undefined
-
-            })
-          )
+          }))
 
       });
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
       console.error(
         "Erreur catalogue Stremio :",
@@ -475,17 +322,12 @@ app.get(
       );
 
       res.status(500).json({
-
         error:
           error.message
-
       });
-
     }
-
   }
 );
-
 
 /* =========================================================
    DEMARRAGE
@@ -498,6 +340,10 @@ app.listen(
 
     console.log(
       `FS15 Clone démarré sur le port ${PORT}`
+    );
+
+    console.log(
+      `FS15 : ${PAGE_SIZE} éléments par page`
     );
 
   }
