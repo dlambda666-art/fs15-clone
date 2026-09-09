@@ -9,6 +9,7 @@ const loading = document.getElementById("loading");
 const empty = document.getElementById("empty");
 
 let state = {
+  page: "nouveautes",
   sort: "new"
 };
 
@@ -35,6 +36,7 @@ menuOverlay.addEventListener("click", closeSideMenu);
    ========================================================= */
 
 async function api(url) {
+
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -53,7 +55,8 @@ async function loadCategories() {
 
   try {
 
-    const data = await api("/api/categories");
+    const data =
+      await api("/api/categories");
 
     genreList.innerHTML = "";
 
@@ -63,20 +66,31 @@ async function loadCategories() {
 
     data.genres.forEach(genre => {
 
-      const button = document.createElement("button");
+      const button =
+        document.createElement("button");
 
-      button.className = "category-button";
-      button.textContent = genre;
+      button.className =
+        "category-button";
 
-      button.addEventListener("click", () => {
+      button.textContent =
+        genre;
 
-        state.genre = genre;
+      button.addEventListener(
+        "click",
+        () => {
 
-        closeSideMenu();
+          state = {
+            sort: "new",
+            page: null,
+            genre: genre
+          };
 
-        loadCatalog();
+          closeSideMenu();
 
-      });
+          loadCatalog();
+
+        }
+      );
 
       genreList.appendChild(button);
 
@@ -100,30 +114,98 @@ async function loadCategories() {
 
 function buildCatalogUrl() {
 
-  const params = new URLSearchParams();
+  /*
+   * Les pages principales utilisent
+   * maintenant les routes dédiées
+   * du serveur.
+   */
+
+  if (state.page) {
+
+    const params =
+      new URLSearchParams();
+
+    if (state.type) {
+      params.set(
+        "type",
+        state.type
+      );
+    }
+
+    if (state.language) {
+      params.set(
+        "language",
+        state.language
+      );
+    }
+
+    if (state.genre) {
+      params.set(
+        "genre",
+        state.genre
+      );
+    }
+
+    if (state.q) {
+      params.set(
+        "q",
+        state.q
+      );
+    }
+
+    const query =
+      params.toString();
+
+    return query
+      ? `/api/page/${encodeURIComponent(state.page)}?${query}`
+      : `/api/page/${encodeURIComponent(state.page)}`;
+  }
+
+
+  /*
+   * Filtres classiques :
+   * genre, langue, recherche...
+   */
+
+  const params =
+    new URLSearchParams();
 
   if (state.type) {
-    params.set("type", state.type);
+    params.set(
+      "type",
+      state.type
+    );
   }
 
   if (state.language) {
-    params.set("language", state.language);
+    params.set(
+      "language",
+      state.language
+    );
   }
 
   if (state.genre) {
-    params.set("genre", state.genre);
+    params.set(
+      "genre",
+      state.genre
+    );
   }
 
   if (state.q) {
-    params.set("q", state.q);
+    params.set(
+      "q",
+      state.q
+    );
   }
 
   if (state.sort) {
-    params.set("sort", state.sort);
+    params.set(
+      "sort",
+      state.sort
+    );
   }
 
   return `/api/catalog?${params.toString()}`;
-
 }
 
 
@@ -135,32 +217,40 @@ function createPoster(item) {
 
   if (!item.poster) {
 
-    const placeholder = document.createElement("div");
+    const placeholder =
+      document.createElement("div");
 
-    placeholder.className = "poster";
+    placeholder.className =
+      "poster";
 
     return placeholder;
 
   }
 
-  const image = document.createElement("img");
+  const image =
+    document.createElement("img");
 
-  image.className = "poster";
+  image.className =
+    "poster";
 
-  image.loading = "lazy";
+  image.loading =
+    "lazy";
 
-  image.alt = item.title || "";
+  image.alt =
+    item.title || "";
 
-  image.src = item.poster;
+  image.src =
+    item.poster;
 
   image.onerror = () => {
 
-    image.removeAttribute("src");
+    image.removeAttribute(
+      "src"
+    );
 
   };
 
   return image;
-
 }
 
 
@@ -170,39 +260,50 @@ function createPoster(item) {
 
 function createBadges(item) {
 
-  const container = document.createElement("div");
+  const container =
+    document.createElement("div");
 
-  container.className = "badges";
+  container.className =
+    "badges";
 
 
   if (item.language) {
 
-    const language = document.createElement("span");
+    const language =
+      document.createElement("span");
 
-    language.className = "badge";
+    language.className =
+      "badge";
 
-    language.textContent = item.language;
+    language.textContent =
+      item.language;
 
-    container.appendChild(language);
+    container.appendChild(
+      language
+    );
 
   }
 
 
   if (item.quality) {
 
-    const quality = document.createElement("span");
+    const quality =
+      document.createElement("span");
 
-    quality.className = "badge";
+    quality.className =
+      "badge";
 
-    quality.textContent = item.quality;
+    quality.textContent =
+      item.quality;
 
-    container.appendChild(quality);
+    container.appendChild(
+      quality
+    );
 
   }
 
 
   return container;
-
 }
 
 
@@ -212,61 +313,88 @@ function createBadges(item) {
 
 function createCard(item) {
 
-  const card = document.createElement("article");
+  const card =
+    document.createElement("article");
 
-  card.className = "card";
+  card.className =
+    "card";
 
-  card.dataset.id = item.id;
-
-
-  const poster = createPoster(item);
-
-  card.appendChild(poster);
+  card.dataset.id =
+    item.id;
 
 
-  const badges = createBadges(item);
+  const poster =
+    createPoster(item);
 
-  card.appendChild(badges);
+  card.appendChild(
+    poster
+  );
 
 
-  const score = document.createElement("span");
+  const badges =
+    createBadges(item);
 
-  score.className = "score";
+  card.appendChild(
+    badges
+  );
+
+
+  const score =
+    document.createElement("span");
+
+  score.className =
+    "score";
 
 
   if (item.rating) {
 
     score.textContent =
-      Number(item.rating).toFixed(1);
+      Number(item.rating)
+        .toFixed(1);
 
-  } else if (item.year) {
+  }
 
-    score.textContent = item.year;
+  else if (item.year) {
+
+    score.textContent =
+      item.year;
 
   }
 
 
-  card.appendChild(score);
+  card.appendChild(
+    score
+  );
 
 
-  const title = document.createElement("div");
+  const title =
+    document.createElement("div");
 
-  title.className = "title";
+  title.className =
+    "title";
 
-  title.textContent = item.title || "Sans titre";
+  title.textContent =
+    item.title ||
+    "Sans titre";
 
-  card.appendChild(title);
+  card.appendChild(
+    title
+  );
 
 
-  card.addEventListener("click", () => {
+  card.addEventListener(
+    "click",
+    () => {
 
-    openItem(item.id);
+      openItem(
+        item.id
+      );
 
-  });
+    }
+  );
 
 
   return card;
-
 }
 
 
@@ -276,21 +404,29 @@ function createCard(item) {
 
 async function loadCatalog() {
 
-  loading.classList.remove("hidden");
+  loading.classList.remove(
+    "hidden"
+  );
 
-  empty.classList.add("hidden");
+  empty.classList.add(
+    "hidden"
+  );
 
-  catalog.innerHTML = "";
+  catalog.innerHTML =
+    "";
 
 
   try {
 
-    const data = await api(
-      buildCatalogUrl()
+    const data =
+      await api(
+        buildCatalogUrl()
+      );
+
+
+    loading.classList.add(
+      "hidden"
     );
-
-
-    loading.classList.add("hidden");
 
 
     if (
@@ -298,20 +434,27 @@ async function loadCatalog() {
       !data.items.length
     ) {
 
-      empty.classList.remove("hidden");
+      empty.textContent =
+        "Aucun résultat.";
+
+      empty.classList.remove(
+        "hidden"
+      );
 
       return;
 
     }
 
 
-    data.items.forEach(item => {
+    data.items.forEach(
+      item => {
 
-      catalog.appendChild(
-        createCard(item)
-      );
+        catalog.appendChild(
+          createCard(item)
+        );
 
-    });
+      }
+    );
 
 
   } catch (error) {
@@ -321,12 +464,16 @@ async function loadCatalog() {
       error
     );
 
-    loading.classList.add("hidden");
+    loading.classList.add(
+      "hidden"
+    );
 
     empty.textContent =
       "Impossible de charger le catalogue.";
 
-    empty.classList.remove("hidden");
+    empty.classList.remove(
+      "hidden"
+    );
 
   }
 
@@ -341,9 +488,10 @@ async function openItem(id) {
 
   try {
 
-    const item = await api(
-      `/api/item/${encodeURIComponent(id)}`
-    );
+    const item =
+      await api(
+        `/api/item/${encodeURIComponent(id)}`
+      );
 
     showItem(item);
 
@@ -365,43 +513,74 @@ async function openItem(id) {
 
 function showItem(item) {
 
-  const old = document.getElementById(
-    "itemModal"
-  );
+  const old =
+    document.getElementById(
+      "itemModal"
+    );
 
   if (old) {
     old.remove();
   }
 
 
-  const modal = document.createElement("div");
+  const modal =
+    document.createElement("div");
 
-  modal.id = "itemModal";
+  modal.id =
+    "itemModal";
 
-  modal.style.position = "fixed";
-  modal.style.inset = "0";
-  modal.style.zIndex = "100";
-  modal.style.background = "rgba(0,0,0,.88)";
-  modal.style.overflowY = "auto";
+  modal.style.position =
+    "fixed";
+
+  modal.style.inset =
+    "0";
+
+  modal.style.zIndex =
+    "100";
+
+  modal.style.background =
+    "rgba(0,0,0,.88)";
+
+  modal.style.overflowY =
+    "auto";
 
 
-  const box = document.createElement("div");
+  const box =
+    document.createElement("div");
 
-  box.style.maxWidth = "700px";
-  box.style.margin = "30px auto";
-  box.style.padding = "20px";
-  box.style.background = "#202020";
+  box.style.maxWidth =
+    "700px";
+
+  box.style.margin =
+    "30px auto";
+
+  box.style.padding =
+    "20px";
+
+  box.style.background =
+    "#202020";
 
 
-  const close = document.createElement("button");
+  const close =
+    document.createElement("button");
 
-  close.textContent = "×";
+  close.textContent =
+    "×";
 
-  close.style.float = "right";
-  close.style.background = "none";
-  close.style.border = "0";
-  close.style.color = "#fff";
-  close.style.fontSize = "36px";
+  close.style.float =
+    "right";
+
+  close.style.background =
+    "none";
+
+  close.style.border =
+    "0";
+
+  close.style.color =
+    "#fff";
+
+  close.style.fontSize =
+    "36px";
 
   close.addEventListener(
     "click",
@@ -409,35 +588,54 @@ function showItem(item) {
   );
 
 
-  const title = document.createElement("h1");
+  const title =
+    document.createElement("h1");
 
-  title.textContent = item.title;
+  title.textContent =
+    item.title;
 
 
-  const info = document.createElement("p");
+  const info =
+    document.createElement("p");
 
-  const details = [];
+  const details =
+    [];
+
 
   if (item.year) {
-    details.push(item.year);
-  }
-
-  if (item.language) {
-    details.push(item.language);
-  }
-
-  if (item.quality) {
-    details.push(item.quality);
-  }
-
-  if (item.rating) {
     details.push(
-      `★ ${Number(item.rating).toFixed(1)}`
+      item.year
     );
   }
 
+
+  if (item.language) {
+    details.push(
+      item.language
+    );
+  }
+
+
+  if (item.quality) {
+    details.push(
+      item.quality
+    );
+  }
+
+
+  if (item.rating) {
+
+    details.push(
+      `★ ${Number(item.rating).toFixed(1)}`
+    );
+
+  }
+
+
   info.textContent =
-    details.join(" • ");
+    details.join(
+      " • "
+    );
 
 
   if (item.poster) {
@@ -445,14 +643,24 @@ function showItem(item) {
     const poster =
       document.createElement("img");
 
-    poster.src = item.poster;
+    poster.src =
+      item.poster;
 
-    poster.style.width = "100%";
-    poster.style.maxWidth = "400px";
-    poster.style.display = "block";
-    poster.style.margin = "20px auto";
+    poster.style.width =
+      "100%";
 
-    box.appendChild(poster);
+    poster.style.maxWidth =
+      "400px";
+
+    poster.style.display =
+      "block";
+
+    poster.style.margin =
+      "20px auto";
+
+    box.appendChild(
+      poster
+    );
 
   }
 
@@ -464,18 +672,33 @@ function showItem(item) {
     item.synopsis ||
     "Aucune description disponible.";
 
-  synopsis.style.lineHeight = "1.6";
+  synopsis.style.lineHeight =
+    "1.6";
 
 
-  box.prepend(close);
+  box.prepend(
+    close
+  );
 
-  box.appendChild(title);
-  box.appendChild(info);
-  box.appendChild(synopsis);
+  box.appendChild(
+    title
+  );
 
-  modal.appendChild(box);
+  box.appendChild(
+    info
+  );
 
-  document.body.appendChild(modal);
+  box.appendChild(
+    synopsis
+  );
+
+  modal.appendChild(
+    box
+  );
+
+  document.body.appendChild(
+    modal
+  );
 
 }
 
@@ -485,7 +708,9 @@ function showItem(item) {
    ========================================================= */
 
 document
-  .querySelectorAll(".nav-button")
+  .querySelectorAll(
+    ".nav-button"
+  )
   .forEach(button => {
 
     button.addEventListener(
@@ -493,16 +718,25 @@ document
       () => {
 
         document
-          .querySelectorAll(".nav-button")
-          .forEach(b =>
-            b.classList.remove("active")
+          .querySelectorAll(
+            ".nav-button"
+          )
+          .forEach(
+            b =>
+              b.classList.remove(
+                "active"
+              )
           );
 
 
-        button.classList.add("active");
+        button.classList.add(
+          "active"
+        );
 
 
-        state = {};
+        state = {
+          sort: "new"
+        };
 
 
         const action =
@@ -511,40 +745,58 @@ document
 
         if (action === "new") {
 
-          state.sort = "new";
+          state.page =
+            "nouveautes";
 
         }
 
 
-        else if (action === "rating") {
+        else if (
+          action === "rating"
+        ) {
 
-          state.sort = "rating";
-
-        }
-
-
-        else if (action === "comments") {
-
-          /*
-           * Prévu pour la source de données.
-           * Le backend pourra fournir un
-           * classement par commentaires.
-           */
-
-          state.sort = "comments";
+          state.page =
+            "notes";
 
         }
 
 
-        else if (action === "views") {
+        else if (
+          action === "comments"
+        ) {
 
-          /*
-           * Prévu pour la source de données.
-           * Le backend pourra fournir un
-           * classement par vues.
-           */
+          state.page =
+            "commentes";
 
-          state.sort = "views";
+        }
+
+
+        else if (
+          action === "views"
+        ) {
+
+          state.page =
+            "regardes";
+
+        }
+
+
+        else if (
+          action === "films"
+        ) {
+
+          state.page =
+            "films";
+
+        }
+
+
+        else if (
+          action === "series"
+        ) {
+
+          state.page =
+            "series";
 
         }
 
@@ -573,11 +825,14 @@ document
       () => {
 
         state = {
-          sort: "new"
+          sort: "new",
+          page: null
         };
 
 
-        if (button.dataset.type) {
+        if (
+          button.dataset.type
+        ) {
 
           state.type =
             button.dataset.type;
@@ -585,7 +840,9 @@ document
         }
 
 
-        if (button.dataset.language) {
+        if (
+          button.dataset.language
+        ) {
 
           state.language =
             button.dataset.language;
@@ -614,19 +871,29 @@ search.addEventListener(
   "input",
   () => {
 
-    clearTimeout(searchTimer);
-
-    searchTimer = setTimeout(
-      () => {
-
-        state.q =
-          search.value.trim();
-
-        loadCatalog();
-
-      },
-      250
+    clearTimeout(
+      searchTimer
     );
+
+
+    searchTimer =
+      setTimeout(
+        () => {
+
+          state.page =
+            null;
+
+          state.sort =
+            "new";
+
+          state.q =
+            search.value.trim();
+
+          loadCatalog();
+
+        },
+        250
+      );
 
   }
 );
