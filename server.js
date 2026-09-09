@@ -7,11 +7,10 @@ const SOURCES = {
   series: `${BASE_URL}/index.php?category=s-tv&do=cat`
 };
 
-/*
- * =========================================================
- * CONFIGURATION
- * =========================================================
- */
+
+/* =========================================================
+   CONFIGURATION
+   ========================================================= */
 
 const PAGES = Number(
   process.env.FS15_PAGES || 50
@@ -38,18 +37,14 @@ let lastUpdate = 0;
 let refreshing = false;
 
 
-/*
- * =========================================================
- * HTTP
- * =========================================================
- */
+/* =========================================================
+   HTTP
+   ========================================================= */
 
 async function fetchPage(url) {
 
   const response = await fetch(url, {
-
     headers: {
-
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
 
@@ -58,34 +53,25 @@ async function fetchPage(url) {
 
       "Accept-Language":
         "fr-FR,fr;q=0.9,en;q=0.8"
-
     },
 
     signal:
       AbortSignal.timeout(20000)
-
   });
 
-
   if (!response.ok) {
-
     throw new Error(
       `FS23 HTTP ${response.status}`
     );
-
   }
 
-
   return await response.text();
-
 }
 
 
-/*
- * =========================================================
- * URL
- * =========================================================
- */
+/* =========================================================
+   URL
+   ========================================================= */
 
 function absoluteUrl(url) {
 
@@ -109,50 +95,37 @@ function absoluteUrl(url) {
   }
 
   return BASE_URL + "/" + url;
-
 }
 
 
-/*
- * =========================================================
- * TEXTE
- * =========================================================
- */
+/* =========================================================
+   TEXTE
+   ========================================================= */
 
 function cleanText(value) {
 
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim();
-
 }
 
 
-/*
- * =========================================================
- * LANGUE
- * =========================================================
- */
+/* =========================================================
+   LANGUE
+   ========================================================= */
 
 function detectLanguage(text) {
 
   const value =
     cleanText(text).toUpperCase();
 
-
-  if (
-    value.includes("VF+VOSTFR")
-  ) {
+  if (value.includes("VF+VOSTFR")) {
     return "VF+VOSTFR";
   }
 
-
-  if (
-    value.includes("VOSTFR")
-  ) {
+  if (value.includes("VOSTFR")) {
     return "VOSTFR";
   }
-
 
   if (
     /\bVF\b/.test(value) ||
@@ -163,98 +136,71 @@ function detectLanguage(text) {
     return "VF";
   }
 
-
-  if (
-    /\bVO\b/.test(value)
-  ) {
+  if (/\bVO\b/.test(value)) {
     return "VO";
   }
 
-
   return "";
-
 }
 
 
-/*
- * =========================================================
- * QUALITE
- * =========================================================
- */
+/* =========================================================
+   QUALITE
+   ========================================================= */
 
 function detectQuality(text) {
 
   const value =
     cleanText(text).toUpperCase();
 
-
   const qualities = [
-
     "2160P",
     "2160",
     "4K",
-
     "1080P",
     "1080",
-
     "720P",
     "720",
-
     "HDLIGHT",
     "HD",
-
     "WEB-DL",
     "WEBDL",
     "WEBRIP",
-
     "BLURAY",
     "BLU-RAY",
     "BRRIP",
     "DVDRIP"
-
   ];
 
+  for (const quality of qualities) {
 
-  for (
-    const quality of qualities
-  ) {
-
-    if (
-      value.includes(quality)
-    ) {
+    if (value.includes(quality)) {
       return quality;
     }
 
   }
 
-
   return "";
-
 }
 
 
-/*
- * =========================================================
- * NOTE
- * =========================================================
- */
+/* =========================================================
+   NOTE
+   ========================================================= */
 
 function detectRating(text) {
 
   const value =
     cleanText(text);
 
-
   const matches =
     value.match(
       /\b([0-9](?:[.,][0-9])?)\b/g
     );
 
-
   if (!matches) {
     return 0;
   }
-
 
   const numbers =
     matches
@@ -269,24 +215,17 @@ function detectRating(text) {
           value <= 10
       );
 
-
   if (!numbers.length) {
     return 0;
   }
 
-
-  return numbers[
-    numbers.length - 1
-  ];
-
+  return numbers[numbers.length - 1];
 }
 
 
-/*
- * =========================================================
- * ANNEE
- * =========================================================
- */
+/* =========================================================
+   ANNEE
+   ========================================================= */
 
 function detectYear(text) {
 
@@ -295,19 +234,15 @@ function detectYear(text) {
       /\b(19|20)\d{2}\b/
     );
 
-
   return match
     ? match[0]
     : "";
-
 }
 
 
-/*
- * =========================================================
- * GENRES
- * =========================================================
- */
+/* =========================================================
+   GENRES
+   ========================================================= */
 
 const KNOWN_GENRES = [
 
@@ -316,75 +251,52 @@ const KNOWN_GENRES = [
   "Aventure",
   "Arts Martiaux",
   "Biopic",
-
   "Comédie",
   "Crime",
   "Documentaire",
   "Drame",
   "Famille",
-
   "Fantastique",
   "Guerre",
   "Histoire",
   "Historique",
   "Horreur",
-
   "Espionnage",
   "Policier",
-
   "Romance",
-
   "Science-Fiction",
   "Science fiction",
-
   "Spectacle",
   "Thriller",
   "Western",
-
   "Mystère",
   "Musique",
-
   "Télé-Réalité",
   "K-DRAMA"
-
 ];
 
 
-/*
- * =========================================================
- * NORMALISATION GENRE
- * =========================================================
- */
+/* =========================================================
+   NORMALISATION GENRE
+   ========================================================= */
 
 function normalizeGenre(value) {
 
   const text =
     cleanText(value);
 
-
   if (!text) {
     return "";
   }
 
-
   const normalized =
     text
       .normalize("NFD")
-      .replace(
-        /[\u0300-\u036f]/g,
-        ""
-      )
+      .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
-      .replace(
-        /[-_]+/g,
-        " "
-      )
-      .replace(
-        /\s+/g,
-        " "
-      )
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
       .trim();
-
 
   const aliases = {
 
@@ -405,43 +317,22 @@ function normalizeGenre(value) {
 
     "k-drama":
       "K-DRAMA"
-
   };
 
-
-  if (
-    aliases[normalized]
-  ) {
-
-    return aliases[
-      normalized
-    ];
-
+  if (aliases[normalized]) {
+    return aliases[normalized];
   }
 
-
-  for (
-    const genre of KNOWN_GENRES
-  ) {
+  for (const genre of KNOWN_GENRES) {
 
     const genreNormalized =
       genre
         .normalize("NFD")
-        .replace(
-          /[\u0300-\u036f]/g,
-          ""
-        )
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
-        .replace(
-          /[-_]+/g,
-          " "
-        )
-        .replace(
-          /\s+/g,
-          " "
-        )
+        .replace(/[-_]+/g, " ")
+        .replace(/\s+/g, " ")
         .trim();
-
 
     if (
       normalized ===
@@ -452,56 +343,39 @@ function normalizeGenre(value) {
         genreNormalized ===
         "science fiction"
       ) {
-
         return "Science-Fiction";
-
       }
 
-
       return genre;
-
     }
 
   }
 
-
   return "";
-
 }
 
 
-/*
- * =========================================================
- * EXTRACTION GENRES
- * =========================================================
- */
+/* =========================================================
+   EXTRACTION GENRES
+   ========================================================= */
 
 function extractGenres($) {
 
   const genres = [];
-
 
   function addGenre(value) {
 
     const genre =
       normalizeGenre(value);
 
-
     if (
       genre &&
       !genres.includes(genre)
     ) {
-
       genres.push(genre);
-
     }
 
   }
-
-
-  /*
-   * BLOCS GENRE
-   */
 
   $(
     "[class*='genre'], [id*='genre'], [data-genre], [data-genres]"
@@ -514,44 +388,31 @@ function extractGenres($) {
             $(element).text()
           );
 
-
         const dataGenre =
           $(element).attr(
             "data-genre"
           );
-
 
         const dataGenres =
           $(element).attr(
             "data-genres"
           );
 
-
         if (dataGenre) {
 
           dataGenre
-            .split(
-              /[|,;/]+/
-            )
-            .forEach(
-              addGenre
-            );
+            .split(/[|,;/]+/)
+            .forEach(addGenre);
 
         }
-
 
         if (dataGenres) {
 
           dataGenres
-            .split(
-              /[|,;/]+/
-            )
-            .forEach(
-              addGenre
-            );
+            .split(/[|,;/]+/)
+            .forEach(addGenre);
 
         }
-
 
         if (text) {
 
@@ -560,16 +421,11 @@ function extractGenres($) {
               /Genres?\s*:\s*(.+)$/i
             );
 
-
           if (match) {
 
             match[1]
-              .split(
-                /\s*,\s*/
-              )
-              .forEach(
-                addGenre
-              );
+              .split(/\s*,\s*/)
+              .forEach(addGenre);
 
           }
 
@@ -579,13 +435,7 @@ function extractGenres($) {
     );
 
 
-  /*
-   * LIGNES GENRE
-   */
-
-  $(
-    "tr, li, p, div, span"
-  )
+  $("tr, li, p, div, span")
     .each(
       (_index, element) => {
 
@@ -594,38 +444,26 @@ function extractGenres($) {
             $(element).text()
           );
 
-
         if (!text) {
           return;
         }
-
 
         const match =
           text.match(
             /^Genres?\s*:\s*(.+)$/i
           );
 
-
         if (!match) {
           return;
         }
 
-
         match[1]
-          .split(
-            /\s*,\s*/
-          )
-          .forEach(
-            addGenre
-          );
+          .split(/\s*,\s*/)
+          .forEach(addGenre);
 
       }
     );
 
-
-  /*
-   * SECOURS BODY
-   */
 
   if (!genres.length) {
 
@@ -634,42 +472,30 @@ function extractGenres($) {
         $("body").text()
       );
 
-
     const match =
       bodyText.match(
         /(?:^|\s)Genres?\s*:\s*([^]+?)(?=\s+Réalisateur\s*:|\s+Acteurs?\s*:|\s+Version\s*:|\s+Qualité\s*:)/i
       );
 
-
     if (match) {
 
       match[1]
-        .split(
-          /\s*,\s*/
-        )
-        .forEach(
-          addGenre
-        );
+        .split(/\s*,\s*/)
+        .forEach(addGenre);
 
     }
 
   }
 
-
   return [
-    ...new Set(
-      genres
-    )
+    ...new Set(genres)
   ];
-
 }
 
 
-/*
- * =========================================================
- * EXTRACTION CARTE
- * =========================================================
- */
+/* =========================================================
+   EXTRACTION CARTE
+   ========================================================= */
 
 function extractCard(
   $,
@@ -680,24 +506,18 @@ function extractCard(
   const href =
     $(link).attr("href");
 
-
   if (
     !href ||
     !href.includes("newsid=")
   ) {
-
     return null;
-
   }
-
 
   const url =
     absoluteUrl(href);
 
-
   let node =
     $(link);
-
 
   for (
     let i = 0;
@@ -710,99 +530,66 @@ function extractCard(
         node.text()
       );
 
-
     const images =
       node.find("img");
-
 
     if (
       images.length &&
       text.length > 20
     ) {
-
       break;
-
     }
-
 
     node =
       node.parent();
 
   }
 
-
   const text =
     cleanText(
       node.text()
     );
-
 
   let title =
     cleanText(
       $(link).text()
     );
 
-
   if (!title) {
 
     const image =
-      node.find(
-        "img"
-      ).first();
-
+      node.find("img").first();
 
     title =
       cleanText(
-        image.attr(
-          "alt"
-        )
+        image.attr("alt")
       );
 
   }
-
 
   if (!title) {
     return null;
   }
 
-
   let poster = "";
 
-
   const image =
-    node.find(
-      "img"
-    ).first();
-
+    node.find("img").first();
 
   if (image.length) {
 
     poster =
-      image.attr(
-        "data-src"
-      ) ||
-
-      image.attr(
-        "data-lazy-src"
-      ) ||
-
-      image.attr(
-        "src"
-      ) ||
-
+      image.attr("data-src") ||
+      image.attr("data-lazy-src") ||
+      image.attr("src") ||
       "";
 
   }
 
-
   poster =
-    absoluteUrl(
-      poster
-    );
-
+    absoluteUrl(poster);
 
   let id = "";
-
 
   try {
 
@@ -818,7 +605,6 @@ function extractCard(
 
   }
 
-
   return {
 
     id,
@@ -826,41 +612,30 @@ function extractCard(
     title,
 
     year:
-      detectYear(
-        text
-      ),
+      detectYear(text),
 
     type,
 
     poster,
 
     language:
-      detectLanguage(
-        text
-      ),
+      detectLanguage(text),
 
     quality:
-      detectQuality(
-        text
-      ),
+      detectQuality(text),
 
     rating:
-      detectRating(
-        text
-      ),
+      detectRating(text),
 
     comments: 0,
-
     views: 0,
 
     genres: [],
 
     country: [],
-
     themes: [],
 
     synopsis: "",
-
     trailer: "",
 
     url,
@@ -871,15 +646,12 @@ function extractCard(
     enriched: false
 
   };
-
 }
 
 
-/*
- * =========================================================
- * PARSE LISTING
- * =========================================================
- */
+/* =========================================================
+   PARSE LISTING
+   ========================================================= */
 
 function parseListing(
   html,
@@ -887,16 +659,12 @@ function parseListing(
 ) {
 
   const $ =
-    cheerio.load(
-      html
-    );
-
+    cheerio.load(html);
 
   const results = [];
 
   const seen =
     new Set();
-
 
   $("a[href*='newsid=']")
     .each(
@@ -909,59 +677,36 @@ function parseListing(
             type
           );
 
-
         if (!item) {
           return;
         }
 
-
         if (
-          seen.has(
-            item.id
-          )
+          seen.has(item.id)
         ) {
-
           return;
-
         }
 
+        seen.add(item.id);
 
-        seen.add(
-          item.id
-        );
-
-
-        results.push(
-          item
-        );
+        results.push(item);
 
       }
     );
 
-
   return results;
-
 }
 
 
-/*
- * =========================================================
- * ENRICHISSEMENT FICHE
- * =========================================================
- */
+/* =========================================================
+   ENRICHISSEMENT FICHE
+   ========================================================= */
 
-async function enrichItem(
-  item
-) {
+async function enrichItem(item) {
 
-  if (
-    item.enriched
-  ) {
-
+  if (item.enriched) {
     return item;
-
   }
-
 
   try {
 
@@ -970,12 +715,8 @@ async function enrichItem(
         item.url
       );
 
-
     const $ =
-      cheerio.load(
-        html
-      );
-
+      cheerio.load(html);
 
     const pageText =
       cleanText(
@@ -983,15 +724,12 @@ async function enrichItem(
       );
 
 
-    /*
-     * TITRE
-     */
+    /* TITRE */
 
     const heading =
       $("h1")
         .first()
         .text();
-
 
     if (heading) {
 
@@ -1003,13 +741,10 @@ async function enrichItem(
     }
 
 
-    /*
-     * POSTER
-     */
+    /* POSTER */
 
     const images =
       $("img");
-
 
     for (
       let i = 0;
@@ -1018,20 +753,10 @@ async function enrichItem(
     ) {
 
       const src =
-        $(images[i]).attr(
-          "src"
-        ) ||
-
-        $(images[i]).attr(
-          "data-src"
-        ) ||
-
-        $(images[i]).attr(
-          "data-lazy-src"
-        ) ||
-
+        $(images[i]).attr("src") ||
+        $(images[i]).attr("data-src") ||
+        $(images[i]).attr("data-lazy-src") ||
         "";
-
 
       if (
         src &&
@@ -1043,9 +768,7 @@ async function enrichItem(
       ) {
 
         item.poster =
-          absoluteUrl(
-            src
-          );
+          absoluteUrl(src);
 
         break;
 
@@ -1054,15 +777,12 @@ async function enrichItem(
     }
 
 
-    /*
-     * VERSION
-     */
+    /* VERSION */
 
     const version =
       pageText.match(
         /Version\s*:\s*([^]+?)(?=\s+Qualité|$)/i
       );
-
 
     if (version) {
 
@@ -1074,15 +794,12 @@ async function enrichItem(
     }
 
 
-    /*
-     * QUALITE
-     */
+    /* QUALITE */
 
     const quality =
       pageText.match(
         /Qualité\s*:\s*([^]+)/i
       );
-
 
     if (quality) {
 
@@ -1098,15 +815,12 @@ async function enrichItem(
     }
 
 
-    /*
-     * DATE
-     */
+    /* DATE */
 
     const release =
       pageText.match(
         /Date de sortie\s*:\s*([^]+)/i
       );
-
 
     if (release) {
 
@@ -1118,19 +832,13 @@ async function enrichItem(
     }
 
 
-    /*
-     * GENRES
-     */
+    /* GENRES */
 
     item.genres =
-      extractGenres(
-        $
-      );
+      extractGenres($);
 
 
-    /*
-     * SECOURS LANGUE
-     */
+    /* SECOURS LANGUE */
 
     if (!item.language) {
 
@@ -1142,9 +850,7 @@ async function enrichItem(
     }
 
 
-    /*
-     * SECOURS QUALITE
-     */
+    /* SECOURS QUALITE */
 
     if (!item.quality) {
 
@@ -1156,9 +862,7 @@ async function enrichItem(
     }
 
 
-    /*
-     * SECOURS ANNEE
-     */
+    /* SECOURS ANNEE */
 
     if (!item.year) {
 
@@ -1170,8 +874,7 @@ async function enrichItem(
     }
 
 
-    item.enriched =
-      true;
+    item.enriched = true;
 
 
     console.log(
@@ -1180,7 +883,6 @@ async function enrichItem(
         "aucun"
       }`
     );
-
 
   }
   catch (error) {
@@ -1192,24 +894,17 @@ async function enrichItem(
 
   }
 
-
   return item;
-
 }
 
 
-/*
- * =========================================================
- * ENRICHISSEMENT PAR LOTS
- * =========================================================
- */
+/* =========================================================
+   ENRICHISSEMENT PAR LOTS
+   ========================================================= */
 
-async function enrichItems(
-  items
-) {
+async function enrichItems(items) {
 
   const results = [];
-
 
   for (
     let start = 0;
@@ -1220,32 +915,25 @@ async function enrichItems(
     const batch =
       items.slice(
         start,
-        start +
-          ENRICH_CONCURRENCY
+        start + ENRICH_CONCURRENCY
       );
-
 
     const enriched =
       await Promise.all(
         batch.map(
           item =>
-            enrichItem(
-              item
-            )
+            enrichItem(item)
         )
       );
-
 
     results.push(
       ...enriched
     );
 
-
     console.log(
       `FS23 enrichissement: ${
         Math.min(
-          start +
-            batch.length,
+          start + batch.length,
           items.length
         )
       }/${items.length}`
@@ -1253,17 +941,13 @@ async function enrichItems(
 
   }
 
-
   return results;
-
 }
 
 
-/*
- * =========================================================
- * CHARGEMENT DES PAGES FS23
- * =========================================================
- */
+/* =========================================================
+   CHARGEMENT DES PAGES FS23
+   ========================================================= */
 
 async function loadSource(
   source,
@@ -1274,7 +958,6 @@ async function loadSource(
 
   const seen =
     new Set();
-
 
   for (
     let page = 1;
@@ -1289,17 +972,12 @@ async function loadSource(
           ? source
           : `${source}&cstart=${page}`;
 
-
       console.log(
         `FS23 ${type}: page ${page}/${PAGES}`
       );
 
-
       const html =
-        await fetchPage(
-          url
-        );
-
+        await fetchPage(url);
 
       const items =
         parseListing(
@@ -1307,38 +985,27 @@ async function loadSource(
           type
         );
 
-
       console.log(
         `FS23 ${type}: page ${page} -> ${items.length} éléments`
       );
-
 
       for (
         const item of items
       ) {
 
         if (
-          !seen.has(
-            item.id
-          )
+          !seen.has(item.id)
         ) {
 
-          seen.add(
-            item.id
-          );
+          seen.add(item.id);
 
-          all.push(
-            item
-          );
+          all.push(item);
 
         }
 
       }
 
-
-      if (
-        !items.length
-      ) {
+      if (!items.length) {
 
         console.log(
           `FS23 ${type}: fin pagination à la page ${page}`
@@ -1360,39 +1027,27 @@ async function loadSource(
 
   }
 
-
   return all;
-
 }
 
 
-/*
- * =========================================================
- * REFRESH COMPLET
- * =========================================================
- */
+/* =========================================================
+   REFRESH COMPLET
+   ========================================================= */
 
 async function refreshCache() {
 
-  if (
-    refreshing
-  ) {
-
+  if (refreshing) {
     return cache;
-
   }
 
-
-  refreshing =
-    true;
-
+  refreshing = true;
 
   try {
 
     console.log(
       "FS15 : actualisation du catalogue..."
     );
-
 
     const [
       films,
@@ -1419,13 +1074,10 @@ async function refreshCache() {
     ];
 
 
-    /*
-     * DEDUPLICATION
-     */
+    /* DEDUPLICATION */
 
     const unique =
       new Map();
-
 
     for (
       const item of combined
@@ -1433,15 +1085,10 @@ async function refreshCache() {
 
       if (
         !item.id ||
-        unique.has(
-          item.id
-        )
+        unique.has(item.id)
       ) {
-
         continue;
-
       }
-
 
       unique.set(
         item.id,
@@ -1452,9 +1099,7 @@ async function refreshCache() {
 
 
     const catalogue =
-      [
-        ...unique.values()
-      ];
+      [...unique.values()];
 
 
     console.log(
@@ -1463,23 +1108,20 @@ async function refreshCache() {
 
 
     /*
-     * IMPORTANT
+     * ON GARDE L'ORDRE FS23
      *
-     * Le cache contient TOUT le catalogue.
-     * Aucune coupe à 18 ici.
+     * Les nouveautés restent donc
+     * naturellement en début de catalogue.
      */
 
     cache =
       catalogue;
 
-
     lastUpdate =
       Date.now();
 
 
-    /*
-     * PREMIER LOT ENRICHIT
-     */
+    /* PREMIER LOT */
 
     const firstBatch =
       cache.slice(
@@ -1493,9 +1135,7 @@ async function refreshCache() {
     );
 
 
-    /*
-     * RESTE EN ARRIERE-PLAN
-     */
+    /* RESTE EN ARRIERE-PLAN */
 
     const remaining =
       cache.slice(
@@ -1503,9 +1143,7 @@ async function refreshCache() {
       );
 
 
-    if (
-      remaining.length
-    ) {
+    if (remaining.length) {
 
       setImmediate(
         async () => {
@@ -1515,7 +1153,6 @@ async function refreshCache() {
             await enrichItems(
               remaining
             );
-
 
             console.log(
               `FS15 : enrichissement complet terminé (${cache.length} éléments)`
@@ -1547,19 +1184,15 @@ async function refreshCache() {
   }
   finally {
 
-    refreshing =
-      false;
+    refreshing = false;
 
   }
-
 }
 
 
-/*
- * =========================================================
- * FILTRE GENRE
- * =========================================================
- */
+/* =========================================================
+   FILTRE GENRE
+   ========================================================= */
 
 function filterByGenre(
   items,
@@ -1567,24 +1200,17 @@ function filterByGenre(
 ) {
 
   if (!genre) {
-
     return items;
-
   }
-
 
   const wanted =
     normalizeGenre(
       genre
     );
 
-
   if (!wanted) {
-
     return [];
-
   }
-
 
   return items.filter(
     item => {
@@ -1594,11 +1220,8 @@ function filterByGenre(
           item.genres
         )
       ) {
-
         return false;
-
       }
-
 
       return item.genres.some(
         itemGenre =>
@@ -1609,15 +1232,12 @@ function filterByGenre(
 
     }
   );
-
 }
 
 
-/*
- * =========================================================
- * PAGE STREMIO
- * =========================================================
- */
+/* =========================================================
+   PAGINATION
+   ========================================================= */
 
 function getPageNumber(
   options = {}
@@ -1632,15 +1252,12 @@ function getPageNumber(
         options.page
       );
 
-
     if (
       Number.isFinite(page) &&
       page >= 1
     ) {
 
-      return Math.floor(
-        page
-      );
+      return Math.floor(page);
 
     }
 
@@ -1656,7 +1273,6 @@ function getPageNumber(
         options.skip
       );
 
-
     if (
       Number.isFinite(skip) &&
       skip >= 0
@@ -1664,7 +1280,144 @@ function getPageNumber(
 
       return (
         Math.floor(
-          skip /
-          PAGE_SIZE
+          skip / PAGE_SIZE
         ) + 1
       );
+
+    }
+
+  }
+
+
+  return 1;
+}
+
+
+/* =========================================================
+   CATALOGUE PUBLIC
+   ========================================================= */
+
+async function getCatalogue(
+  options = {}
+) {
+
+  const now =
+    Date.now();
+
+
+  /* PREMIER APPEL */
+
+  if (!cache.length) {
+
+    await refreshCache();
+
+  }
+
+  else if (
+    now -
+      lastUpdate >
+      REFRESH_MS
+  ) {
+
+    refreshCache()
+      .catch(
+        error =>
+          console.error(
+            "FS15 refresh:",
+            error.message
+          )
+      );
+
+  }
+
+
+  let result =
+    [...cache];
+
+
+  /* TYPE */
+
+  if (
+    options.type
+  ) {
+
+    result =
+      result.filter(
+        item =>
+          item.type ===
+          options.type
+      );
+
+  }
+
+
+  /* GENRE */
+
+  if (
+    options.genre
+  ) {
+
+    result =
+      filterByGenre(
+        result,
+        options.genre
+      );
+
+  }
+
+
+  /* PAGINATION */
+
+  const page =
+    getPageNumber(
+      options
+    );
+
+
+  const start =
+    (page - 1) *
+    PAGE_SIZE;
+
+
+  const end =
+    start +
+    PAGE_SIZE;
+
+
+  const pageResults =
+    result.slice(
+      start,
+      end
+    );
+
+
+  console.log(
+    `FS15 catalogue: type=${options.type || "all"} genre=${options.genre || "all"} page=${page} -> ${pageResults.length} éléments / ${result.length}`
+  );
+
+
+  return pageResults;
+}
+
+
+/* =========================================================
+   EXPORT
+   ========================================================= */
+
+module.exports = {
+
+  getCatalogue,
+
+  refreshCache,
+
+  filterByGenre,
+
+  normalizeGenre,
+
+  KNOWN_GENRES,
+
+  PAGE_SIZE,
+
+  PAGES
+
+};
