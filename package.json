@@ -1,0 +1,13 @@
+{
+  "name": "fs15-clone",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FS15-style dynamic catalogue",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
