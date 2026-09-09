@@ -8,16 +8,18 @@ const genreList = document.getElementById("genreList");
 const loading = document.getElementById("loading");
 const empty = document.getElementById("empty");
 
-
-/* =========================================================
-   ETAT
-   ========================================================= */
-
 let state = {
   sort: "new",
-  page: 1,
-  perPage: 18
+  page: 1
 };
+
+
+/* =========================================================
+   PAGINATION
+   ========================================================= */
+
+const PAGE_SIZE = 18;
+const MAX_VISIBLE_PAGES = 6;
 
 
 /* =========================================================
@@ -83,7 +85,7 @@ async function api(url) {
    CATEGORIES
    ========================================================= */
 
-function loadCategories() {
+async function loadCategories() {
 
   genreList.innerHTML = "";
 
@@ -98,20 +100,22 @@ function loadCategories() {
     button.textContent =
       genre;
 
-    button.addEventListener("click", () => {
+    button.addEventListener(
+      "click",
+      () => {
 
-      state = {
-        sort: "new",
-        page: 1,
-        perPage: 18,
-        genre: genre
-      };
+        state = {
+          sort: "new",
+          page: 1,
+          genre: genre
+        };
 
-      closeSideMenu();
+        closeSideMenu();
 
-      loadCatalog();
+        loadCatalog();
 
-    });
+      }
+    );
 
     genreList.appendChild(button);
 
@@ -121,7 +125,7 @@ function loadCategories() {
 
 
 /* =========================================================
-   URL API
+   URL CATALOGUE
    ========================================================= */
 
 function buildCatalogUrl() {
@@ -131,24 +135,60 @@ function buildCatalogUrl() {
 
 
   if (state.type) {
-    params.set("type", state.type);
+
+    params.set(
+      "type",
+      state.type
+    );
+
   }
+
 
   if (state.language) {
-    params.set("language", state.language);
+
+    params.set(
+      "language",
+      state.language
+    );
+
   }
+
 
   if (state.genre) {
-    params.set("genre", state.genre);
+
+    params.set(
+      "genre",
+      state.genre
+    );
+
   }
+
 
   if (state.q) {
-    params.set("q", state.q);
+
+    params.set(
+      "q",
+      state.q
+    );
+
   }
 
+
   if (state.sort) {
-    params.set("sort", state.sort);
+
+    params.set(
+      "sort",
+      state.sort
+    );
+
   }
+
+
+  params.set(
+    "page",
+    String(state.page || 1)
+  );
+
 
   return `/api/catalog?${params.toString()}`;
 
@@ -173,6 +213,7 @@ function createPoster(item) {
 
   }
 
+
   const image =
     document.createElement("img");
 
@@ -188,11 +229,15 @@ function createPoster(item) {
   image.src =
     item.poster;
 
+
   image.onerror = () => {
 
-    image.removeAttribute("src");
+    image.removeAttribute(
+      "src"
+    );
 
   };
+
 
   return image;
 
@@ -269,13 +314,19 @@ function createCard(item) {
     item.id;
 
 
+  const poster =
+    createPoster(item);
+
   card.appendChild(
-    createPoster(item)
+    poster
   );
 
 
+  const badges =
+    createBadges(item);
+
   card.appendChild(
-    createBadges(item)
+    badges
   );
 
 
@@ -292,7 +343,9 @@ function createCard(item) {
       Number(item.rating)
         .toFixed(1);
 
-  } else if (item.year) {
+  }
+
+  else if (item.year) {
 
     score.textContent =
       item.year;
@@ -300,7 +353,9 @@ function createCard(item) {
   }
 
 
-  card.appendChild(score);
+  card.appendChild(
+    score
+  );
 
 
   const title =
@@ -313,12 +368,20 @@ function createCard(item) {
     item.title ||
     "Sans titre";
 
-  card.appendChild(title);
+  card.appendChild(
+    title
+  );
 
 
   card.addEventListener(
     "click",
-    () => openItem(item.id)
+    () => {
+
+      openItem(
+        item.id
+      );
+
+    }
   );
 
 
@@ -331,26 +394,19 @@ function createCard(item) {
    PAGINATION
    ========================================================= */
 
-function createPagination(totalItems) {
+function createPagination(hasResults) {
 
-  const old =
+  const oldPagination =
     document.getElementById(
       "pagination"
     );
 
-  if (old) {
-    old.remove();
+  if (oldPagination) {
+    oldPagination.remove();
   }
 
 
-  const totalPages =
-    Math.ceil(
-      totalItems /
-      state.perPage
-    );
-
-
-  if (totalPages <= 1) {
+  if (!hasResults) {
     return;
   }
 
@@ -361,79 +417,126 @@ function createPagination(totalItems) {
   pagination.id =
     "pagination";
 
-
-  pagination.style.display =
-    "flex";
-
-  pagination.style.flexWrap =
-    "wrap";
-
-  pagination.style.justifyContent =
-    "center";
-
-  pagination.style.alignItems =
-    "center";
-
-  pagination.style.gap =
-    "8px";
-
-  pagination.style.padding =
-    "25px 10px 40px";
+  pagination.className =
+    "pagination";
 
 
-  function addButton(
-    label,
-    page,
-    active = false
+  /*
+   * BOUTON PRECEDENT
+   */
+
+  if (state.page > 1) {
+
+    const previous =
+      document.createElement("button");
+
+    previous.className =
+      "page-button";
+
+    previous.textContent =
+      "‹";
+
+    previous.addEventListener(
+      "click",
+      () => {
+
+        state.page--;
+
+        loadCatalog();
+
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth"
+        });
+
+      }
+    );
+
+    pagination.appendChild(
+      previous
+    );
+
+  }
+
+
+  /*
+   * PAGES
+   *
+   * On affiche 1 à 6.
+   * Si on avance, la fenêtre se déplace.
+   */
+
+  let startPage =
+    Math.max(
+      1,
+      state.page - 2
+    );
+
+
+  let endPage =
+    startPage +
+    MAX_VISIBLE_PAGES -
+    1;
+
+
+  if (state.page <= 3) {
+
+    startPage = 1;
+
+    endPage =
+      MAX_VISIBLE_PAGES;
+
+  }
+
+
+  /*
+   * Quand une page ne contient plus aucun
+   * résultat, elle ne sera simplement pas
+   * créée par le bouton suivant.
+   *
+   * Les pages 1 à 6 sont disponibles.
+   */
+
+  for (
+    let page = startPage;
+    page <= endPage;
+    page++
   ) {
 
     const button =
       document.createElement("button");
 
-    button.textContent =
-      label;
+    button.className =
+      "page-button";
 
-    button.style.minWidth =
-      "48px";
+    if (
+      page === state.page
+    ) {
 
-    button.style.height =
-      "42px";
+      button.classList.add(
+        "active"
+      );
 
-    button.style.border =
-      "0";
-
-    button.style.borderRadius =
-      "3px";
-
-    button.style.cursor =
-      "pointer";
-
-    button.style.fontSize =
-      "16px";
-
-    button.style.background =
-      active
-        ? "#ff7518"
-        : "#292929";
-
-    button.style.color =
-      "#fff";
-
-
-    if (active) {
-      button.style.fontWeight =
-        "bold";
     }
+
+    button.textContent =
+      page;
 
 
     button.addEventListener(
       "click",
       () => {
 
+        if (
+          page === state.page
+        ) {
+          return;
+        }
+
         state.page =
           page;
 
-        renderCurrentPage();
+        loadCatalog();
 
         window.scrollTo({
           top: 0,
@@ -451,186 +554,44 @@ function createPagination(totalItems) {
   }
 
 
-  /* PRECEDENT */
-
-  if (state.page > 1) {
-
-    addButton(
-      "‹",
-      state.page - 1
-    );
-
-  }
-
-
   /*
-   * On affiche une fenêtre de pages
-   * pour pouvoir aller très loin :
-   * 1 2 3 4 5 6 ... 50
+   * BOUTON SUIVANT
    */
 
-  let start =
-    Math.max(
-      1,
-      state.page - 2
-    );
+  const next =
+    document.createElement("button");
 
-  let end =
-    Math.min(
-      totalPages,
-      state.page + 2
-    );
+  next.className =
+    "page-button";
+
+  next.textContent =
+    "›";
 
 
-  if (start > 1) {
+  next.addEventListener(
+    "click",
+    () => {
 
-    addButton(
-      "1",
-      1,
-      state.page === 1
-    );
+      state.page++;
 
+      loadCatalog();
 
-    if (start > 2) {
-
-      const dots =
-        document.createElement(
-          "span"
-        );
-
-      dots.textContent =
-        "…";
-
-      dots.style.color =
-        "#fff";
-
-      dots.style.fontSize =
-        "22px";
-
-      pagination.appendChild(
-        dots
-      );
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
 
     }
-
-  }
-
-
-  for (
-    let page = start;
-    page <= end;
-    page++
-  ) {
-
-    addButton(
-      String(page),
-      page,
-      page === state.page
-    );
-
-  }
+  );
 
 
-  if (end < totalPages) {
-
-    if (end < totalPages - 1) {
-
-      const dots =
-        document.createElement(
-          "span"
-        );
-
-      dots.textContent =
-        "…";
-
-      dots.style.color =
-        "#fff";
-
-      dots.style.fontSize =
-        "22px";
-
-      pagination.appendChild(
-        dots
-      );
-
-    }
-
-
-    addButton(
-      String(totalPages),
-      totalPages,
-      state.page === totalPages
-    );
-
-  }
-
-
-  /* SUIVANT */
-
-  if (
-    state.page <
-    totalPages
-  ) {
-
-    addButton(
-      "›",
-      state.page + 1
-    );
-
-  }
+  pagination.appendChild(
+    next
+  );
 
 
   catalog.parentNode.appendChild(
     pagination
-  );
-
-}
-
-
-/* =========================================================
-   RENDU DE LA PAGE COURANTE
-   ========================================================= */
-
-let currentItems = [];
-
-
-function renderCurrentPage() {
-
-  catalog.innerHTML = "";
-
-
-  const start =
-    (
-      state.page - 1
-    ) *
-    state.perPage;
-
-
-  const end =
-    start +
-    state.perPage;
-
-
-  const pageItems =
-    currentItems.slice(
-      start,
-      end
-    );
-
-
-  pageItems.forEach(
-    item => {
-
-      catalog.appendChild(
-        createCard(item)
-      );
-
-    }
-  );
-
-
-  createPagination(
-    currentItems.length
   );
 
 }
@@ -651,6 +612,10 @@ async function loadCatalog() {
   );
 
 
+  catalog.innerHTML =
+    "";
+
+
   const oldPagination =
     document.getElementById(
       "pagination"
@@ -659,10 +624,6 @@ async function loadCatalog() {
   if (oldPagination) {
     oldPagination.remove();
   }
-
-
-  catalog.innerHTML =
-    "";
 
 
   try {
@@ -683,10 +644,23 @@ async function loadCatalog() {
       !data.items.length
     ) {
 
-      currentItems = [];
+      /*
+       * Si la page demandée est vide,
+       * on revient à la page précédente.
+       */
 
-      empty.textContent =
-        "Aucun résultat.";
+      if (
+        state.page > 1
+      ) {
+
+        state.page--;
+
+        await loadCatalog();
+
+        return;
+
+      }
+
 
       empty.classList.remove(
         "hidden"
@@ -697,40 +671,20 @@ async function loadCatalog() {
     }
 
 
-    /*
-     * IMPORTANT :
-     * Le serveur nous donne toute la liste.
-     * On ne coupe PAS les résultats ici.
-     *
-     * La pagination se fait ensuite
-     * uniquement côté interface.
-     */
+    data.items.forEach(
+      item => {
 
-    currentItems =
-      Array.isArray(data.items)
-        ? data.items
-        : [];
+        catalog.appendChild(
+          createCard(item)
+        );
+
+      }
+    );
 
 
-    const totalPages =
-      Math.ceil(
-        currentItems.length /
-        state.perPage
-      );
-
-
-    if (
-      state.page >
-      totalPages
-    ) {
-
-      state.page =
-        totalPages || 1;
-
-    }
-
-
-    renderCurrentPage();
+    createPagination(
+      true
+    );
 
 
   }
@@ -800,6 +754,7 @@ function showItem(item) {
     document.getElementById(
       "itemModal"
     );
+
 
   if (old) {
     old.remove();
@@ -882,7 +837,8 @@ function showItem(item) {
   const info =
     document.createElement("p");
 
-  const details = [];
+  const details =
+    [];
 
 
   if (item.year) {
@@ -907,7 +863,9 @@ function showItem(item) {
 
 
   info.textContent =
-    details.join(" • ");
+    details.join(
+      " • "
+    );
 
 
   if (item.poster) {
@@ -949,18 +907,30 @@ function showItem(item) {
     "1.6";
 
 
-  box.prepend(close);
+  box.prepend(
+    close
+  );
 
-  box.appendChild(title);
+  box.appendChild(
+    title
+  );
 
-  box.appendChild(info);
+  box.appendChild(
+    info
+  );
 
-  box.appendChild(synopsis);
+  box.appendChild(
+    synopsis
+  );
 
 
-  modal.appendChild(box);
+  modal.appendChild(
+    box
+  );
 
-  document.body.appendChild(modal);
+  document.body.appendChild(
+    modal
+  );
 
 }
 
@@ -970,7 +940,9 @@ function showItem(item) {
    ========================================================= */
 
 document
-  .querySelectorAll(".nav-button")
+  .querySelectorAll(
+    ".nav-button"
+  )
   .forEach(button => {
 
     button.addEventListener(
@@ -978,7 +950,9 @@ document
       () => {
 
         document
-          .querySelectorAll(".nav-button")
+          .querySelectorAll(
+            ".nav-button"
+          )
           .forEach(
             b =>
               b.classList.remove(
@@ -993,8 +967,7 @@ document
 
 
         state = {
-          page: 1,
-          perPage: 18
+          page: 1
         };
 
 
@@ -1002,26 +975,34 @@ document
           button.dataset.action;
 
 
-        if (action === "new") {
+        if (
+          action === "new"
+        ) {
 
           state.sort =
             "new";
 
-        } else if (
+        }
+
+        else if (
           action === "rating"
         ) {
 
           state.sort =
             "rating";
 
-        } else if (
+        }
+
+        else if (
           action === "comments"
         ) {
 
           state.sort =
             "comments";
 
-        } else if (
+        }
+
+        else if (
           action === "views"
         ) {
 
@@ -1040,7 +1021,7 @@ document
 
 
 /* =========================================================
-   CATEGORIES FILMS / SERIES / LANGUES
+   CATEGORIES DU MENU
    ========================================================= */
 
 document
@@ -1055,12 +1036,13 @@ document
 
         state = {
           sort: "new",
-          page: 1,
-          perPage: 18
+          page: 1
         };
 
 
-        if (button.dataset.type) {
+        if (
+          button.dataset.type
+        ) {
 
           state.type =
             button.dataset.type;
@@ -1068,7 +1050,9 @@ document
         }
 
 
-        if (button.dataset.language) {
+        if (
+          button.dataset.language
+        ) {
 
           state.language =
             button.dataset.language;
@@ -1090,7 +1074,8 @@ document
    RECHERCHE
    ========================================================= */
 
-let searchTimer = null;
+let searchTimer =
+  null;
 
 
 search.addEventListener(
@@ -1128,7 +1113,7 @@ search.addEventListener(
 
 async function init() {
 
-  loadCategories();
+  await loadCategories();
 
   await loadCatalog();
 
