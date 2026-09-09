@@ -15,6 +15,7 @@ const PAGE_SIZE = Number(
   process.env.FS15_PAGE_SIZE || 18
 );
 
+
 /* =========================================================
    INTERFACE WEB
    ========================================================= */
@@ -35,6 +36,7 @@ app.get("/", (_req, res) => {
   );
 });
 
+
 /* =========================================================
    HEALTH
    ========================================================= */
@@ -44,6 +46,7 @@ app.get("/health", (_req, res) => {
     status: "ok"
   });
 });
+
 
 /* =========================================================
    API CATALOGUE WEB
@@ -71,6 +74,7 @@ app.get(
           offset
         });
 
+
       /* LANGUE */
 
       if (req.query.language) {
@@ -89,6 +93,7 @@ app.get(
               .includes(language)
           );
       }
+
 
       /* RECHERCHE */
 
@@ -113,6 +118,7 @@ app.get(
             );
         }
       }
+
 
       /* TRI */
 
@@ -157,6 +163,7 @@ app.get(
         );
       }
 
+
       res.json({
         page,
         pageSize: PAGE_SIZE,
@@ -177,6 +184,7 @@ app.get(
     }
   }
 );
+
 
 /* =========================================================
    API FICHE
@@ -227,6 +235,7 @@ app.get(
   }
 );
 
+
 /* =========================================================
    CATALOGUE STREMIO
    ========================================================= */
@@ -243,9 +252,10 @@ app.get(
           ? "series"
           : "movie";
 
+
       /*
-       * Stremio envoie généralement
-       * skip pour demander la page suivante.
+       * Stremio utilise skip
+       * pour demander les pages suivantes.
        */
 
       const skip =
@@ -256,12 +266,14 @@ app.get(
           )
         );
 
+
       const genre =
         req.query.genre ||
         undefined;
 
       const pageSize =
         PAGE_SIZE;
+
 
       const items =
         await getCatalogue({
@@ -270,6 +282,7 @@ app.get(
           limit: pageSize,
           offset: skip
         });
+
 
       res.json({
 
@@ -305,6 +318,27 @@ app.get(
                 ? item.genres
                 : [],
 
+
+            /*
+             * =================================================
+             * FS15 → STREMIO
+             * =================================================
+             *
+             * Ces deux champs viennent directement
+             * du moteur FS15.
+             */
+
+            language:
+              item.language ||
+              undefined,
+
+            tags:
+              [
+                item.language,
+                item.quality
+              ].filter(Boolean),
+
+
             imdbRating:
               Number(
                 item.rating || 0
@@ -328,6 +362,7 @@ app.get(
     }
   }
 );
+
 
 /* =========================================================
    DEMARRAGE
