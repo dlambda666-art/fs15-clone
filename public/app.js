@@ -13,13 +13,8 @@ let state = {
   page: 1
 };
 
-
-/* =========================================================
-   PAGINATION
-   ========================================================= */
-
 const PAGE_SIZE = 18;
-const MAX_VISIBLE_PAGES = 6;
+const MAX_PAGES = 50;
 
 
 /* =========================================================
@@ -82,7 +77,7 @@ async function api(url) {
 
 
 /* =========================================================
-   CATEGORIES
+   GENRES
    ========================================================= */
 
 async function loadCategories() {
@@ -91,31 +86,24 @@ async function loadCategories() {
 
   KNOWN_GENRES.forEach(genre => {
 
-    const button =
-      document.createElement("button");
+    const button = document.createElement("button");
 
-    button.className =
-      "category-button";
+    button.className = "category-button";
+    button.textContent = genre;
 
-    button.textContent =
-      genre;
+    button.addEventListener("click", () => {
 
-    button.addEventListener(
-      "click",
-      () => {
+      state = {
+        sort: "new",
+        genre: genre,
+        page: 1
+      };
 
-        state = {
-          sort: "new",
-          page: 1,
-          genre: genre
-        };
+      closeSideMenu();
 
-        closeSideMenu();
+      loadCatalog();
 
-        loadCatalog();
-
-      }
-    );
+    });
 
     genreList.appendChild(button);
 
@@ -125,13 +113,12 @@ async function loadCategories() {
 
 
 /* =========================================================
-   URL CATALOGUE
+   CONSTRUCTION URL CATALOGUE
    ========================================================= */
 
 function buildCatalogUrl() {
 
-  const params =
-    new URLSearchParams();
+  const params = new URLSearchParams();
 
 
   if (state.type) {
@@ -184,6 +171,22 @@ function buildCatalogUrl() {
   }
 
 
+  /*
+   * =======================================================
+   * IMPORTANT
+   *
+   * C'est cette ligne qui manquait.
+   *
+   * Le serveur reçoit maintenant :
+   *
+   * /api/catalog?page=1
+   * /api/catalog?page=2
+   * /api/catalog?page=3
+   *
+   * etc.
+   * =======================================================
+   */
+
   params.set(
     "page",
     String(state.page || 1)
@@ -206,8 +209,7 @@ function createPoster(item) {
     const placeholder =
       document.createElement("div");
 
-    placeholder.className =
-      "poster";
+    placeholder.className = "poster";
 
     return placeholder;
 
@@ -217,11 +219,9 @@ function createPoster(item) {
   const image =
     document.createElement("img");
 
-  image.className =
-    "poster";
+  image.className = "poster";
 
-  image.loading =
-    "lazy";
+  image.loading = "lazy";
 
   image.alt =
     item.title || "";
@@ -232,9 +232,7 @@ function createPoster(item) {
 
   image.onerror = () => {
 
-    image.removeAttribute(
-      "src"
-    );
+    image.removeAttribute("src");
 
   };
 
@@ -253,8 +251,7 @@ function createBadges(item) {
   const container =
     document.createElement("div");
 
-  container.className =
-    "badges";
+  container.className = "badges";
 
 
   if (item.language) {
@@ -262,8 +259,7 @@ function createBadges(item) {
     const language =
       document.createElement("span");
 
-    language.className =
-      "badge";
+    language.className = "badge";
 
     language.textContent =
       item.language;
@@ -280,8 +276,7 @@ function createBadges(item) {
     const quality =
       document.createElement("span");
 
-    quality.className =
-      "badge";
+    quality.className = "badge";
 
     quality.textContent =
       item.quality;
@@ -307,8 +302,7 @@ function createCard(item) {
   const card =
     document.createElement("article");
 
-  card.className =
-    "card";
+  card.className = "card";
 
   card.dataset.id =
     item.id;
@@ -333,15 +327,13 @@ function createCard(item) {
   const score =
     document.createElement("span");
 
-  score.className =
-    "score";
+  score.className = "score";
 
 
   if (item.rating) {
 
     score.textContent =
-      Number(item.rating)
-        .toFixed(1);
+      Number(item.rating).toFixed(1);
 
   }
 
@@ -361,8 +353,7 @@ function createCard(item) {
   const title =
     document.createElement("div");
 
-  title.className =
-    "title";
+  title.className = "title";
 
   title.textContent =
     item.title ||
@@ -394,20 +385,19 @@ function createCard(item) {
    PAGINATION
    ========================================================= */
 
-function createPagination(hasResults) {
+function createPagination() {
 
-  const oldPagination =
+  /*
+   * Supprime une ancienne pagination
+   */
+
+  const old =
     document.getElementById(
       "pagination"
     );
 
-  if (oldPagination) {
-    oldPagination.remove();
-  }
-
-
-  if (!hasResults) {
-    return;
+  if (old) {
+    old.remove();
   }
 
 
@@ -422,84 +412,14 @@ function createPagination(hasResults) {
 
 
   /*
-   * BOUTON PRECEDENT
-   */
-
-  if (state.page > 1) {
-
-    const previous =
-      document.createElement("button");
-
-    previous.className =
-      "page-button";
-
-    previous.textContent =
-      "‹";
-
-    previous.addEventListener(
-      "click",
-      () => {
-
-        state.page--;
-
-        loadCatalog();
-
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth"
-        });
-
-      }
-    );
-
-    pagination.appendChild(
-      previous
-    );
-
-  }
-
-
-  /*
-   * PAGES
+   * Pour l'instant on affiche 50 pages maximum.
    *
-   * On affiche 1 à 6.
-   * Si on avance, la fenêtre se déplace.
-   */
-
-  let startPage =
-    Math.max(
-      1,
-      state.page - 2
-    );
-
-
-  let endPage =
-    startPage +
-    MAX_VISIBLE_PAGES -
-    1;
-
-
-  if (state.page <= 3) {
-
-    startPage = 1;
-
-    endPage =
-      MAX_VISIBLE_PAGES;
-
-  }
-
-
-  /*
-   * Quand une page ne contient plus aucun
-   * résultat, elle ne sera simplement pas
-   * créée par le bouton suivant.
-   *
-   * Les pages 1 à 6 sont disponibles.
+   * Le serveur possède lui aussi FS15_PAGES=50.
    */
 
   for (
-    let page = startPage;
-    page <= endPage;
+    let page = 1;
+    page <= MAX_PAGES;
     page++
   ) {
 
@@ -508,6 +428,10 @@ function createPagination(hasResults) {
 
     button.className =
       "page-button";
+
+    button.textContent =
+      page;
+
 
     if (
       page === state.page
@@ -519,24 +443,26 @@ function createPagination(hasResults) {
 
     }
 
-    button.textContent =
-      page;
-
 
     button.addEventListener(
       "click",
       () => {
 
-        if (
-          page === state.page
-        ) {
-          return;
-        }
+        /*
+         * IMPORTANT :
+         * On change réellement la page.
+         */
 
         state.page =
           page;
 
+
         loadCatalog();
+
+
+        /*
+         * Retour en haut du catalogue
+         */
 
         window.scrollTo({
           top: 0,
@@ -555,42 +481,11 @@ function createPagination(hasResults) {
 
 
   /*
-   * BOUTON SUIVANT
+   * On place la pagination
+   * après le catalogue.
    */
 
-  const next =
-    document.createElement("button");
-
-  next.className =
-    "page-button";
-
-  next.textContent =
-    "›";
-
-
-  next.addEventListener(
-    "click",
-    () => {
-
-      state.page++;
-
-      loadCatalog();
-
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-      });
-
-    }
-  );
-
-
-  pagination.appendChild(
-    next
-  );
-
-
-  catalog.parentNode.appendChild(
+  catalog.after(
     pagination
   );
 
@@ -612,26 +507,28 @@ async function loadCatalog() {
   );
 
 
-  catalog.innerHTML =
-    "";
+  /*
+   * Supprime uniquement le catalogue.
+   * La pagination sera reconstruite après.
+   */
 
-
-  const oldPagination =
-    document.getElementById(
-      "pagination"
-    );
-
-  if (oldPagination) {
-    oldPagination.remove();
-  }
+  catalog.innerHTML = "";
 
 
   try {
 
+    const url =
+      buildCatalogUrl();
+
+
+    console.log(
+      "FS15 URL catalogue:",
+      url
+    );
+
+
     const data =
-      await api(
-        buildCatalogUrl()
-      );
+      await api(url);
 
 
     loading.classList.add(
@@ -644,27 +541,15 @@ async function loadCatalog() {
       !data.items.length
     ) {
 
-      /*
-       * Si la page demandée est vide,
-       * on revient à la page précédente.
-       */
-
-      if (
-        state.page > 1
-      ) {
-
-        state.page--;
-
-        await loadCatalog();
-
-        return;
-
-      }
-
+      empty.textContent =
+        "Aucun résultat.";
 
       empty.classList.remove(
         "hidden"
       );
+
+
+      createPagination();
 
       return;
 
@@ -682,9 +567,11 @@ async function loadCatalog() {
     );
 
 
-    createPagination(
-      true
-    );
+    /*
+     * Pagination après affichage
+     */
+
+    createPagination();
 
 
   }
@@ -727,6 +614,7 @@ async function openItem(id) {
       await api(
         `/api/item/${encodeURIComponent(id)}`
       );
+
 
     showItem(item);
 
@@ -837,21 +725,23 @@ function showItem(item) {
   const info =
     document.createElement("p");
 
-  const details =
-    [];
+  const details = [];
 
 
   if (item.year) {
     details.push(item.year);
   }
 
+
   if (item.language) {
     details.push(item.language);
   }
 
+
   if (item.quality) {
     details.push(item.quality);
   }
+
 
   if (item.rating) {
 
@@ -863,9 +753,7 @@ function showItem(item) {
 
 
   info.textContent =
-    details.join(
-      " • "
-    );
+    details.join(" • ");
 
 
   if (item.poster) {
@@ -1021,7 +909,7 @@ document
 
 
 /* =========================================================
-   CATEGORIES DU MENU
+   CATEGORIES MENU
    ========================================================= */
 
 document
@@ -1074,8 +962,7 @@ document
    RECHERCHE
    ========================================================= */
 
-let searchTimer =
-  null;
+let searchTimer = null;
 
 
 search.addEventListener(
@@ -1094,8 +981,15 @@ search.addEventListener(
           state.q =
             search.value.trim();
 
+
+          /*
+           * Une nouvelle recherche
+           * recommence à la page 1.
+           */
+
           state.page =
             1;
+
 
           loadCatalog();
 
