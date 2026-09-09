@@ -11,98 +11,140 @@ app.use(express.static(path.join(__dirname, "public")));
 
 
 /* =========================================================
-   FILTRAGE / TRI
+   FS23
    ========================================================= */
 
-async function filtered(query = {}) {
-  let items = [...await getCatalogue()];
+const FS23 = "https://fs23.lol";
+
+
+/* =========================================================
+   SOURCES REELLES
+   ========================================================= */
+
+const SOURCES = {
+
+  films:
+    `${FS23}/index.php?category=films&do=cat`,
+
+  series:
+    `${FS23}/index.php?category=s-tv&do=cat`,
+
+  topFilms:
+    `${FS23}/index.php?category=top-film&do=cat`,
+
+  communityFilms:
+    `${FS23}/index.php?category=film-commu&do=cat`
+
+};
+
+
+/* =========================================================
+   CATALOGUE LOCAL
+   ========================================================= */
+
+async function localCatalogue(query = {}) {
+
+  let items =
+    [...await getCatalogue()];
 
   const {
     type,
     genre,
     language,
+    year,
     q,
-    sort,
-    year
+    sort
   } = query;
 
 
-  /* TYPE */
-
   if (type) {
-    items = items.filter(
-      item => item.type === type
-    );
+
+    items =
+      items.filter(
+        item =>
+          item.type === type
+      );
+
   }
 
-
-  /* GENRE */
 
   if (genre) {
 
     const wanted =
-      String(genre).toLowerCase();
+      String(genre)
+        .toLowerCase();
 
-    items = items.filter(item =>
-      Array.isArray(item.genres) &&
-      item.genres.some(
-        g =>
-          String(g).toLowerCase() === wanted
-      )
-    );
+    items =
+      items.filter(item =>
+        Array.isArray(item.genres) &&
+        item.genres.some(
+          g =>
+            String(g)
+              .toLowerCase() === wanted
+        )
+      );
+
   }
 
-
-  /* LANGUE */
 
   if (language) {
 
     const wanted =
-      String(language).toLowerCase();
+      String(language)
+        .toLowerCase();
 
-    items = items.filter(item =>
-      String(item.language || "")
+    items =
+      items.filter(item =>
+        String(
+          item.language || ""
+        )
         .toLowerCase()
         .includes(wanted)
-    );
+      );
+
   }
 
-
-  /* ANNEE */
 
   if (year) {
 
-    items = items.filter(
-      item =>
-        String(item.year || "") ===
-        String(year)
-    );
+    items =
+      items.filter(
+        item =>
+          String(
+            item.year || ""
+          ) === String(year)
+      );
+
   }
 
-
-  /* RECHERCHE */
 
   if (q) {
 
     const search =
-      String(q).toLowerCase();
+      String(q)
+        .toLowerCase();
 
-    items = items.filter(item =>
+    items =
+      items.filter(item =>
 
-      String(item.title || "")
+        String(
+          item.title || ""
+        )
         .toLowerCase()
         .includes(search)
 
-      ||
+        ||
 
-      String(item.synopsis || "")
+        String(
+          item.synopsis || ""
+        )
         .toLowerCase()
         .includes(search)
-    );
+
+      );
+
   }
 
-
-  /* TRI */
 
   switch (sort) {
 
@@ -149,9 +191,6 @@ async function filtered(query = {}) {
 
       break;
 
-
-    default:
-      break;
   }
 
 
@@ -170,27 +209,34 @@ app.get(
     try {
 
       const items =
-        await filtered(req.query);
+        await localCatalogue(
+          req.query
+        );
 
       res.json({
         items,
         count: items.length
       });
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.error(error);
 
       res.status(500).json({
-        error: "Erreur catalogue"
+        error:
+          "Erreur catalogue"
       });
+
     }
+
   }
 );
 
 
 /* =========================================================
-   PAGES FS15
+   PAGES PRINCIPALES
    ========================================================= */
 
 app.get(
@@ -199,67 +245,109 @@ app.get(
 
     try {
 
-      const pages = {
+      const page =
+        req.params.page;
 
-        nouveautes: {},
+
+      /*
+       * Pour l'instant les pages
+       * qui peuvent être représentées
+       * directement par notre catalogue.
+       */
+
+      const configs = {
+
+        nouveautes: {
+          type: null,
+          sort: "new"
+        },
+
+        films: {
+          type: "movie",
+          sort: "new"
+        },
+
+        series: {
+          type: "series",
+          sort: "new"
+        },
 
         notes: {
+          type: "movie",
           sort: "rating"
         },
 
         commentes: {
+          type: "movie",
           sort: "comments"
         },
 
         regardes: {
+          type: "movie",
           sort: "views"
-        },
-
-        films: {
-          type: "movie"
-        },
-
-        series: {
-          type: "series"
         }
+
       };
 
 
       const config =
-        pages[req.params.page];
+        configs[page];
 
 
       if (!config) {
 
-        return res.status(404).json({
-          error: "Page inconnue"
-        });
+        return res.status(404)
+          .json({
+            error:
+              "Page inconnue"
+          });
+
       }
 
 
       const items =
-        await filtered(config);
+        await localCatalogue(
+          config
+        );
 
 
       res.json({
 
-        page:
-          req.params.page,
+        page,
+
+        source:
+          SOURCES[
+            page === "notes"
+              ? "topFilms"
+              : page === "commentes"
+                ? "communityFilms"
+                : page === "films"
+                  ? "films"
+                  : page === "series"
+                    ? "series"
+                    : "films"
+          ],
 
         items,
 
         count:
           items.length
+
       });
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.error(error);
 
       res.status(500).json({
-        error: "Erreur page"
+        error:
+          "Erreur page"
       });
+
     }
+
   }
 );
 
@@ -279,16 +367,18 @@ app.get(
 
 
       const genres =
-        [...new Set(
-
-          items.flatMap(
-            item =>
-              Array.isArray(item.genres)
-                ? item.genres
-                : []
+        [
+          ...new Set(
+            items.flatMap(
+              item =>
+                Array.isArray(
+                  item.genres
+                )
+                  ? item.genres
+                  : []
+            )
           )
-
-        )]
+        ]
         .filter(Boolean)
         .sort(
           (a, b) =>
@@ -300,18 +390,18 @@ app.get(
 
 
       const years =
-        [...new Set(
-
-          items
-            .map(
-              item =>
-                String(
-                  item.year || ""
-                )
-            )
-            .filter(Boolean)
-
-        )]
+        [
+          ...new Set(
+            items
+              .map(
+                item =>
+                  String(
+                    item.year || ""
+                  )
+              )
+              .filter(Boolean)
+          )
+        ]
         .sort(
           (a, b) =>
             Number(b) -
@@ -320,6 +410,8 @@ app.get(
 
 
       res.json({
+
+        sources: SOURCES,
 
         types: [
           "movie",
@@ -335,49 +427,23 @@ app.get(
 
         genres,
 
-        years,
+        years
 
-        countries:
-          [...new Set(
-
-            items.flatMap(
-              item =>
-                Array.isArray(
-                  item.country
-                )
-                  ? item.country
-                  : []
-            )
-
-          )]
-          .filter(Boolean)
-          .sort(),
-
-        themes:
-          [...new Set(
-
-            items.flatMap(
-              item =>
-                Array.isArray(
-                  item.themes
-                )
-                  ? item.themes
-                  : []
-            )
-
-          )]
-          .filter(Boolean)
-          .sort()
       });
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.error(error);
 
       res.status(500).json({
-        error: "Erreur catégories"
+        error:
+          "Erreur catégories"
       });
+
     }
+
   }
 );
 
@@ -404,11 +470,12 @@ app.get(
           items: [],
           count: 0
         });
+
       }
 
 
       const items =
-        await filtered({
+        await localCatalogue({
           q
         });
 
@@ -418,14 +485,19 @@ app.get(
         count: items.length
       });
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.error(error);
 
       res.status(500).json({
-        error: "Erreur recherche"
+        error:
+          "Erreur recherche"
       });
+
     }
+
   }
 );
 
@@ -454,22 +526,47 @@ app.get(
 
       if (!item) {
 
-        return res.status(404).json({
-          error: "Fiche introuvable"
-        });
+        return res.status(404)
+          .json({
+            error:
+              "Fiche introuvable"
+          });
+
       }
 
 
       res.json(item);
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.error(error);
 
       res.status(500).json({
-        error: "Erreur fiche"
+        error:
+          "Erreur fiche"
       });
+
     }
+
+  }
+);
+
+
+/* =========================================================
+   SOURCES FS23
+   ========================================================= */
+
+app.get(
+  "/api/fs23/sources",
+  (_req, res) => {
+
+    res.json({
+      base: FS23,
+      sources: SOURCES
+    });
+
   }
 );
 
@@ -484,8 +581,12 @@ app.get(
 
     res.json({
       status: "ok",
-      service: "fs15-clone"
+      service:
+        "fs15-clone",
+      source:
+        "fs23.lol"
     });
+
   }
 );
 
@@ -499,7 +600,7 @@ app.listen(
   () => {
 
     console.log(
-      `FS15 Clone lancé sur le port ${PORT}`
+      `FS23 Clone lancé sur le port ${PORT}`
     );
 
   }
