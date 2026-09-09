@@ -1,220 +1,884 @@
-const fs = require("fs");
-const path = require("path");
+const cheerio = require("cheerio");
 
-const LOCAL_FILE = path.join(
-  __dirname,
-  "..",
-  "data",
-  "catalog.json"
+const BASE_URL = "https://fs15.lol";
+
+const SOURCES = {
+  films: "https://fs15.lol/index.php?category=films&do=cat",
+  series: "https://fs15.lol/index.php?category=s-tv&do=cat"
+};
+
+const PAGES = Number(
+  process.env.FS15_PAGES || 8
 );
-
-let remoteCache = [];
-let lastUpdate = 0;
 
 const REFRESH_MS = Number(
-  process.env.CATALOG_REFRESH_MS || 300000
+  process.env.FS15_REFRESH_MS || 600000
 );
 
-function normalize(item, index) {
-  return {
-    id: String(item.id ?? `item-${index}`),
+const MAX_RESULTS = Number(
+  process.env.FS15_MAX_RESULTS || 80
+);
 
-    title: String(
-      item.title ??
-      item.name ??
-      "Sans titre"
-    ),
-
-    year: item.year ?? "",
-
-    type:
-      item.type === "series"
-        ? "series"
-        : "movie",
-
-    poster:
-      item.poster ??
-      item.image ??
-      "",
-
-    language:
-      item.language ??
-      item.lang ??
-      "",
-
-    quality:
-      item.quality ??
-      item.type_quality ??
-      "",
-
-    genres:
-      Array.isArray(item.genres)
-        ? item.genres
-        : [],
-
-    country:
-      Array.isArray(item.country)
-        ? item.country
-        : [],
-
-    themes:
-      Array.isArray(item.themes)
-        ? item.themes
-        : [],
-
-    addedAt:
-      item.addedAt ??
-      item.added_at ??
-      new Date(0).toISOString(),
-
-    rating:
-      Number(item.rating ?? item.score ?? 0),
-
-    comments:
-      Number(item.comments ?? 0),
-
-    views:
-      Number(item.views ?? 0),
-
-    synopsis:
-      item.synopsis ??
-      item.description ??
-      "",
-
-    trailer:
-      item.trailer ??
-      ""
-  };
-}
+let cache = [];
+let lastUpdate = 0;
 
 
-function loadLocal() {
+/* =========================================================
+   HTTP
+   ========================================================= */
 
-  try {
+async function fetchPage(url) {
 
-    if (!fs.existsSync(LOCAL_FILE)) {
-      return [];
-    }
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+      "Accept":
+        "text/html,application/xhtml+xml"
+    },
+    signal: AbortSignal.timeout(20000)
+  });
 
-    const raw =
-      fs.readFileSync(
-        LOCAL_FILE,
-        "utf8"
-      );
-
-    const data =
-      JSON.parse(raw);
-
-    return Array.isArray(data)
-      ? data.map(normalize)
-      : [];
-
-  } catch (error) {
-
-    console.error(
-      "Erreur catalogue local :",
-      error.message
+  if (!response.ok) {
+    throw new Error(
+      `FS15 HTTP ${response.status}`
     );
-
-    return [];
-
   }
+
+  return await response.text();
 }
 
 
-async function loadRemote() {
+/* =========================================================
+   URL
+   ========================================================= */
 
-  const url =
-    process.env.CATALOG_URL;
+function absoluteUrl(url) {
 
   if (!url) {
-    return [];
+    return "";
   }
+
+  if (
+    url.startsWith("http://") ||
+    url.startsWith("https://")
+  ) {
+    return url;
+  }
+
+  if (url.startsWith("//")) {
+    return "https:" + url;
+  }
+
+  if (url.startsWith("/")) {
+    return BASE_URL + url;
+  }
+
+  return BASE_URL + "/" + url;
+}
+
+
+/* =========================================================
+   TEXTE
+   ========================================================= */
+
+function cleanText(value) {
+
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+}
+
+
+/* =========================================================
+   EXTRACTION DES BADGES
+   ========================================================= */
+
+function detectLanguage(text) {
+
+  const value =
+    cleanText(text)
+      .toUpperCase();
+
+
+  if (
+    value.includes("VF+VOSTFR")
+  ) {
+    return "VF+VOSTFR";
+  }
+
+
+  if (
+    value.includes("VOSTFR")
+  ) {
+    return "VOSTFR";
+  }
+
+
+  if (
+    /\bVF\b/.test(value) ||
+    value.includes("TRUEFRENCH") ||
+    value.includes("FRENCH")
+  ) {
+    return "VF";
+  }
+
+
+  if (
+    /\bVO\b/.test(value)
+  ) {
+    return "VO";
+  }
+
+
+  return "";
+
+}
+
+
+function detectQuality(text) {
+
+  const value =
+    cleanText(text)
+      .toUpperCase();
+
+
+  const qualities = [
+    "2160P",
+    "4K",
+    "1080P",
+    "720P",
+    "HDLIGHT",
+    "HD",
+    "WEB-DL",
+    "WEBRIP",
+    "BLURAY",
+    "BRRIP",
+    "DVDRIP"
+  ];
+
+
+  for (const quality of qualities) {
+
+    if (
+      value.includes(quality)
+    ) {
+      return quality;
+    }
+
+  }
+
+
+  return "";
+
+}
+
+
+/* =========================================================
+   NOTE
+   ========================================================= */
+
+function detectRating(text) {
+
+  const value =
+    cleanText(text);
+
+
+  const matches =
+    value.match(
+      /\b([0-9](?:[.,][0-9])?)\b/g
+    );
+
+
+  if (!matches) {
+    return 0;
+  }
+
+
+  const numbers =
+    matches
+      .map(v =>
+        Number(
+          v.replace(",", ".")
+        )
+      )
+      .filter(
+        v =>
+          v >= 0 &&
+          v <= 10
+      );
+
+
+  if (!numbers.length) {
+    return 0;
+  }
+
+
+  return numbers[numbers.length - 1];
+
+}
+
+
+/* =========================================================
+   DATE
+   ========================================================= */
+
+function detectYear(text) {
+
+  const match =
+    cleanText(text)
+      .match(
+        /\b(19|20)\d{2}\b/
+      );
+
+
+  return match
+    ? match[0]
+    : "";
+
+}
+
+
+/* =========================================================
+   EXTRACTION D'UNE CARTE
+   ========================================================= */
+
+function extractCard($, link) {
+
+  const href =
+    $(link).attr("href");
+
+
+  if (
+    !href ||
+    !href.includes("newsid=")
+  ) {
+    return null;
+  }
+
+
+  const url =
+    absoluteUrl(href);
+
+
+  /*
+   * On remonte progressivement dans le DOM
+   * afin de récupérer le bloc contenant
+   * affiche + titre + badges + description.
+   */
+
+  let node =
+    $(link);
+
+
+  for (let i = 0; i < 6; i++) {
+
+    const text =
+      cleanText(
+        node.text()
+      );
+
+
+    const images =
+      node.find("img");
+
+
+    if (
+      images.length &&
+      text.length > 20
+    ) {
+      break;
+    }
+
+
+    node =
+      node.parent();
+
+  }
+
+
+  const text =
+    cleanText(
+      node.text()
+    );
+
+
+  let title =
+    cleanText(
+      $(link).text()
+    );
+
+
+  if (!title) {
+
+    const image =
+      node.find("img").first();
+
+    title =
+      cleanText(
+        image.attr("alt")
+      );
+
+  }
+
+
+  if (!title) {
+    return null;
+  }
+
+
+  let poster = "";
+
+
+  const image =
+    node.find("img").first();
+
+
+  if (image.length) {
+
+    poster =
+      image.attr("data-src") ||
+      image.attr("data-lazy-src") ||
+      image.attr("src") ||
+      "";
+
+  }
+
+
+  poster =
+    absoluteUrl(poster);
+
+
+  const language =
+    detectLanguage(text);
+
+
+  const quality =
+    detectQuality(text);
+
+
+  const rating =
+    detectRating(text);
+
+
+  const year =
+    detectYear(text);
+
+
+  return {
+
+    id:
+      new URL(
+        url
+      ).searchParams.get(
+        "newsid"
+      ),
+
+    title,
+
+    year,
+
+    type:
+      "movie",
+
+    poster,
+
+    language,
+
+    quality,
+
+    rating,
+
+    comments: 0,
+
+    views: 0,
+
+    genres: [],
+
+    country: [],
+
+    themes: [],
+
+    synopsis: "",
+
+    trailer: "",
+
+    url,
+
+    addedAt:
+      new Date().toISOString()
+
+  };
+
+}
+
+
+/* =========================================================
+   CATALOGUE D'UNE PAGE
+   ========================================================= */
+
+function parseListing(html, type) {
+
+  const $ =
+    cheerio.load(html);
+
+
+  const results = [];
+
+  const seen =
+    new Set();
+
+
+  $("a[href*='newsid=']")
+    .each(
+      (_index, element) => {
+
+        const item =
+          extractCard(
+            $,
+            element
+          );
+
+
+        if (!item) {
+          return;
+        }
+
+
+        if (
+          seen.has(item.id)
+        ) {
+          return;
+        }
+
+
+        seen.add(item.id);
+
+
+        item.type =
+          type;
+
+
+        results.push(item);
+
+      }
+    );
+
+
+  return results;
+
+}
+
+
+/* =========================================================
+   FICHE FS15
+   ========================================================= */
+
+async function enrichItem(item) {
 
   try {
 
-    const response =
-      await fetch(url, {
-        headers: {
-          "Accept":
-            "application/json"
-        }
-      });
-
-    if (!response.ok) {
-
-      throw new Error(
-        `HTTP ${response.status}`
+    const html =
+      await fetchPage(
+        item.url
       );
+
+
+    const $ =
+      cheerio.load(html);
+
+
+    const pageText =
+      cleanText(
+        $("body").text()
+      );
+
+
+    /*
+     * TITRE
+     */
+
+    const heading =
+      $("h1")
+        .first()
+        .text();
+
+
+    if (heading) {
+
+      item.title =
+        cleanText(
+          heading
+        );
 
     }
 
-    const data =
-      await response.json();
 
-    if (!Array.isArray(data)) {
+    /*
+     * AFFICHAGE
+     */
 
-      throw new Error(
-        "La source doit retourner un tableau JSON"
-      );
+    const images =
+      $("img");
+
+
+    for (
+      let i = 0;
+      i < images.length;
+      i++
+    ) {
+
+      const src =
+        $(images[i]).attr("src") ||
+        $(images[i]).attr("data-src") ||
+        "";
+
+
+      if (
+        src &&
+        (
+          src.includes("tmdb") ||
+          src.includes("poster") ||
+          src.includes("upload")
+        )
+      ) {
+
+        item.poster =
+          absoluteUrl(src);
+
+        break;
+
+      }
 
     }
 
-    return data.map(normalize);
+
+    /*
+     * VERSION
+     */
+
+    const version =
+      pageText.match(
+        /Version\s*:\s*([^\n]+?)(?=\s+Qualité|$)/i
+      );
+
+
+    if (version) {
+
+      item.language =
+        cleanText(
+          version[1]
+        );
+
+    }
+
+
+    /*
+     * QUALITÉ
+     */
+
+    const quality =
+      pageText.match(
+        /Qualité\s*:\s*([^\n]+)/i
+      );
+
+
+    if (quality) {
+
+      item.quality =
+        cleanText(
+          quality[1]
+        )
+        .split(
+          "Date de sortie"
+        )[0]
+        .trim();
+
+    }
+
+
+    /*
+     * DATE DE SORTIE
+     */
+
+    const release =
+      pageText.match(
+        /Date de sortie\s*:\s*([^\n]+)/i
+      );
+
+
+    if (release) {
+
+      item.year =
+        detectYear(
+          release[1]
+        );
+
+    }
+
+
+    /*
+     * GENRES
+     */
+
+    const genre =
+      pageText.match(
+        /Genre\s*:\s*([^\n]+)/i
+      );
+
+
+    if (genre) {
+
+      item.genres =
+        cleanText(
+          genre[1]
+        )
+          .split(",")
+          .map(
+            value =>
+              value.trim()
+          )
+          .filter(Boolean);
+
+    }
+
+
+    /*
+     * SYNOPSIS
+     */
+
+    const synopsis =
+      $("meta[name='description']")
+        .attr("content");
+
+
+    if (synopsis) {
+
+      item.synopsis =
+        cleanText(
+          synopsis
+        );
+
+    }
+
 
   } catch (error) {
 
     console.error(
-      "Erreur source distante :",
+      "Erreur fiche FS15:",
+      item.url,
       error.message
     );
 
-    return [];
-
   }
+
+
+  return item;
+
 }
 
+
+/* =========================================================
+   RÉCUPÉRATION DES PAGES
+   ========================================================= */
+
+async function collectSource(
+  baseUrl,
+  type
+) {
+
+  const all = [];
+
+
+  for (
+    let page = 1;
+    page <= PAGES;
+    page++
+  ) {
+
+    const url =
+      page === 1
+        ? baseUrl
+        : `${baseUrl}&cstart=${page}`;
+
+
+    try {
+
+      console.log(
+        `FS15 ${type}: page ${page}`
+      );
+
+
+      const html =
+        await fetchPage(url);
+
+
+      const items =
+        parseListing(
+          html,
+          type
+        );
+
+
+      all.push(
+        ...items
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        `FS15 ${type} page ${page}:`,
+        error.message
+      );
+
+    }
+
+  }
+
+
+  return all;
+
+}
+
+
+/* =========================================================
+   CATALOGUE COMPLET
+   ========================================================= */
+
+async function refresh() {
+
+  console.log(
+    "Actualisation du catalogue FS15..."
+  );
+
+
+  const [
+    movies,
+    series
+  ] =
+    await Promise.all([
+      collectSource(
+        SOURCES.films,
+        "movie"
+      ),
+
+      collectSource(
+        SOURCES.series,
+        "series"
+      )
+    ]);
+
+
+  const combined =
+    [
+      ...movies,
+      ...series
+    ];
+
+
+  const unique =
+    new Map();
+
+
+  for (const item of combined) {
+
+    if (
+      !item.id ||
+      unique.has(item.id)
+    ) {
+      continue;
+    }
+
+
+    unique.set(
+      item.id,
+      item
+    );
+
+  }
+
+
+  const catalogue =
+    [...unique.values()];
+
+
+  /*
+   * Les pages FS15 sont déjà présentées
+   * dans l'ordre des nouveautés.
+   * On conserve donc cet ordre.
+   */
+
+  const limited =
+    catalogue.slice(
+      0,
+      MAX_RESULTS
+    );
+
+
+  /*
+   * On enrichit les premiers éléments
+   * avec les informations de leur fiche.
+   */
+
+  for (
+    const item of limited
+  ) {
+
+    await enrichItem(
+      item
+    );
+
+  }
+
+
+  cache =
+    limited;
+
+
+  lastUpdate =
+    Date.now();
+
+
+  console.log(
+    `FS15: ${cache.length} éléments chargés`
+  );
+
+
+  return cache;
+
+}
+
+
+/* =========================================================
+   API INTERNE
+   ========================================================= */
 
 async function getCatalogue() {
 
-  const now = Date.now();
-
   if (
-    remoteCache.length &&
-    now - lastUpdate < REFRESH_MS
+    cache.length &&
+    Date.now() -
+      lastUpdate <
+      REFRESH_MS
   ) {
 
-    return remoteCache;
+    return cache;
 
   }
 
 
-  if (process.env.CATALOG_URL) {
-
-    const remote =
-      await loadRemote();
-
-    if (remote.length) {
-
-      remoteCache =
-        remote;
-
-      lastUpdate =
-        now;
-
-      return remoteCache;
-
-    }
-
-  }
-
-
-  return loadLocal();
+  return refresh();
 
 }
 
 
+/* =========================================================
+   EXPORT
+   ========================================================= */
+
 module.exports = {
   getCatalogue,
-  normalize
+  normalize: item => item
 };
