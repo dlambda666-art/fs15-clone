@@ -902,57 +902,30 @@ async function refreshCache() {
    ========================================================= */
 
 function filterByGenre(items, genre) {
-  if (!genre) {
-    return items;
-  }
+  if (!genre) return items;
 
-  const wanted =
-    normalizeGenre(genre);
-
-  if (!wanted) {
-    return [];
-  }
-
-  /*
-   * REGLE SPECIALE HORREUR
-   */
+  const wanted = normalizeGenre(genre);
+  if (!wanted) return [];
 
   if (wanted === "Horreur") {
     return items.filter(item => {
-
-      if (
-        !Array.isArray(item.genres) ||
-        !item.genres.length
-      ) {
-        return false;
-      }
+      const genres = Array.isArray(item.genres)
+        ? item.genres.map(normalizeGenre)
+        : [];
 
       return (
-        normalizeGenre(
-          item.genres[0]
-        ) === "Horreur"
+        genres.includes("Horreur") &&
+        !genres.includes("Drame") &&
+        !genres.includes("Comédie") &&
+        !genres.includes("Romance")
       );
     });
   }
 
-  /*
-   * AUTRES GENRES
-   */
-
-  return items.filter(item => {
-
-    if (
-      !Array.isArray(item.genres)
-    ) {
-      return false;
-    }
-
-    return item.genres.some(
-      itemGenre =>
-        normalizeGenre(itemGenre) ===
-        wanted
-    );
-  });
+  return items.filter(item =>
+    Array.isArray(item.genres) &&
+    item.genres.some(g => normalizeGenre(g) === wanted)
+  );
 }
 
 
