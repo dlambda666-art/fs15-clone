@@ -5,7 +5,7 @@ const { getCatalogue } = require("./server.js");
 const app = express();
 
 const PORT = Number(process.env.PORT || 7860);
-const PAGE_SIZE = Number(process.env.FS15_PAGE_SIZE || 18);
+const PAGE_SIZE = Number(process.env.FS15_PAGE_SIZE || 50);
 
 const FRENCH_POSTER_BASE = String(
   process.env.FRENCH_POSTER_BASE ||
