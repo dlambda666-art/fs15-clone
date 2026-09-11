@@ -1,0 +1,97 @@
+{
+  "id": "fr.lambda666.fs15clone",
+  "version": "1.0.0",
+  "name": "FS15 Clone",
+  "description": "Catalogue dynamique Films et Séries",
+  "resources": [
+    "catalog"
+  ],
+  "types": [
+    "movie",
+    "series"
+  ],
+  "catalogs": [
+    {
+      "type": "movie",
+      "id": "fs15-films",
+      "name": "Films FS15",
+      "extra": [
+        {
+          "name": "genre",
+          "isRequired": false,
+          "options": [
+            "Action",
+            "Animation",
+            "Aventure",
+            "Arts Martiaux",
+            "Biopic",
+            "Comédie",
+            "Crime",
+            "Documentaire",
+            "Drame",
+            "Famille",
+            "Fantastique",
+            "Guerre",
+            "Histoire",
+            "Historique",
+            "Horreur",
+            "Espionnage",
+            "Policier",
+            "Romance",
+            "Science-Fiction",
+            "Spectacle",
+            "Thriller",
+            "Western",
+            "Mystère",
+            "Musique",
+            "Judiciaire",
+            "Médical",
+            "K-DRAMA",
+            "Télé-Réalité"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "series",
+      "id": "fs15-series",
+      "name": "Séries FS15",
+      "extra": [
+        {
+          "name": "genre",
+          "isRequired": false,
+          "options": [
+            "Action",
+            "Animation",
+            "Aventure",
+            "Arts Martiaux",
+            "Biopic",
+            "Comédie",
+            "Crime",
+            "Documentaire",
+            "Drame",
+            "Famille",
+            "Fantastique",
+            "Guerre",
+            "Histoire",
+            "Historique",
+            "Horreur",
+            "Espionnage",
+            "Policier",
+            "Romance",
+            "Science-Fiction",
+            "Spectacle",
+            "Thriller",
+            "Western",
+            "Mystère",
+            "Musique",
+            "Judiciaire",
+            "Médical",
+            "K-DRAMA",
+            "Télé-Réalité"
+          ]
+        }
+      ]
+    }
+  ]
+}
