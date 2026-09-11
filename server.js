@@ -1394,9 +1394,10 @@ async function loadGeneralSource(
 
 }
 
-
 /* =========================================================
-   CHARGEMENT DES SOURCES PAR GENRE
+   CHARGEMENT DES FILMS PAR GENRE
+   2026 ET PLUS
+   MAX 50 FILMS PAR GENRE
    ========================================================= */
 
 async function loadGenreSources() {
@@ -1407,7 +1408,12 @@ async function loadGenreSources() {
 
   const GENRE_PAGES =
     Number(
-      process.env.FS15_GENRE_PAGES || 3
+      process.env.FS15_GENRE_PAGES || 6
+    );
+
+  const GENRE_MAX =
+    Number(
+      process.env.FS15_GENRE_MAX || 50
     );
 
   const entries =
@@ -1425,14 +1431,22 @@ async function loadGenreSources() {
     try {
 
       console.log(
-        `FS15 genre : ${genre}`
+        `FS15 genre : ${genre} — objectif ${GENRE_MAX} films 2026+`
       );
+
+      let genreCount = 0;
 
       for (
         let page = 1;
         page <= GENRE_PAGES;
         page++
       ) {
+
+        if (
+          genreCount >= GENRE_MAX
+        ) {
+          break;
+        }
 
         const url =
           buildPageUrl(
@@ -1469,7 +1483,32 @@ async function loadGenreSources() {
 
           if (
             !item ||
-            !item.id ||
+            !item.id
+          ) {
+            continue;
+          }
+
+          /*
+           * FILMS 2026 ET PLUS UNIQUEMENT
+           */
+
+          const year =
+            Number(
+              item.year
+            );
+
+          if (
+            !Number.isFinite(year) ||
+            year < 2026
+          ) {
+            continue;
+          }
+
+          /*
+           * Déduplication globale
+           */
+
+          if (
             seen.has(item.id)
           ) {
             continue;
@@ -1479,19 +1518,30 @@ async function loadGenreSources() {
 
           all.push(item);
 
+          genreCount++;
           newItems++;
+
+          /*
+           * Maximum 50 films par genre
+           */
+
+          if (
+            genreCount >= GENRE_MAX
+          ) {
+            break;
+          }
 
         }
 
         /*
-         * Protection contre une pagination
-         * qui renverrait exactement les mêmes films.
+         * Protection contre les pages
+         * qui ne fournissent plus rien de nouveau.
          */
 
         if (!newItems) {
 
           console.log(
-            `FS15 genre ${genre}: page répétée, arrêt`
+            `FS15 genre ${genre}: aucune nouvelle sortie 2026+ sur cette page, arrêt`
           );
 
           break;
@@ -1499,6 +1549,10 @@ async function loadGenreSources() {
         }
 
       }
+
+      console.log(
+        `FS15 genre ${genre}: ${genreCount} films 2026+ retenus`
+      );
 
     }
 
@@ -1514,12 +1568,13 @@ async function loadGenreSources() {
   }
 
   console.log(
-    `FS15 : ${all.length} films récupérés depuis les sources de genres`
+    `FS15 : ${all.length} films 2026+ récupérés depuis les sources de genres`
   );
 
   return all;
 
 }
+
 /* =========================================================
    REFRESH COMPLET
    ========================================================= */
