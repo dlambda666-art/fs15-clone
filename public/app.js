@@ -460,16 +460,35 @@ async function loadCatalog() {
     }
 
 
-    data.items.forEach(
-      item => {
+    /* =========================================================
+   TRI NOUVEAUTÉS
+   =========================================================
+   Les années les plus récentes passent en premier.
+   Exemple : 2026 → 2025 → 2024 → etc.
+   ========================================================= */
 
-        catalog.appendChild(
-          createCard(item)
-        );
+data.items.sort((a, b) => {
 
-      }
+  const yearA =
+    Number(a.year) || 0;
+
+  const yearB =
+    Number(b.year) || 0;
+
+  return yearB - yearA;
+
+});
+
+
+data.items.forEach(
+  item => {
+
+    catalog.appendChild(
+      createCard(item)
     );
 
+  }
+);
 
     console.log(
       `FS15 interface : ${data.items.length} éléments affichés`
