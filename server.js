@@ -1542,7 +1542,52 @@ async function refreshCache() {
       `FS15 : ${cache.length} éléments uniques avant enrichissement`
     );
 
+    /* =====================================================
+   PRÉ-FILTRE FILMS : 2025+
+   =====================================================
 
+   On évite d'enrichir les vieux films.
+
+   - Films 2025+  → conservés
+   - Films 2024-  → retirés
+   - Année inconnue → conservés
+   - Séries → conservées
+
+   Le filtre final 2025+ reste ensuite comme
+   sécurité supplémentaire.
+   ===================================================== */
+
+cache =
+  cache.filter(
+    item => {
+
+      // Les séries ne sont pas concernées
+      if (
+        item.type !== "movie"
+      ) {
+        return true;
+      }
+
+      const year =
+        Number(item.year);
+
+      // Si l'année n'est pas connue,
+      // on conserve le film par sécurité
+      if (
+        !Number.isFinite(year)
+      ) {
+        return true;
+      }
+
+      // Plancher : 2025
+      return year >= 2025;
+
+    }
+  );
+
+console.log(
+  `FS15 : ${cache.length} éléments à enrichir après pré-filtre 2025+`
+);
     /* =====================================================
        ENRICHISSEMENT
        ===================================================== */
