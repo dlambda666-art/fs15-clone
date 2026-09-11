@@ -18,7 +18,7 @@ let refreshing = false;
    ========================================================= */
 
 const SOURCES = {
-  films: `${BASE_URL}/films/`,
+  films: `${BASE_URL}/index.php?category=film-commu&do=cat`,
   series: `${BASE_URL}/index.php?category=s-tv&do=cat`
 };
 
