@@ -1,8 +1,9 @@
 {
   "id": "fr.lambda666.fs15clone",
-  "version": "1.0.0",
-  "name": "FS15 Clone",
+  "version": "1.0.1",
+  "name": "Frankenstream",
   "description": "Catalogue dynamique Films et Séries",
+  "logo": "https://lambda666-fs15-clone.hf.space/frankenstream.png",
   "resources": [
     "catalog"
   ],
