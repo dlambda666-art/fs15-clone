@@ -1394,6 +1394,7 @@ async function loadGeneralSource(
 
 }
 
+
 /* =========================================================
    CHARGEMENT DES SOURCES PAR GENRE
    ========================================================= */
@@ -1403,6 +1404,11 @@ async function loadGenreSources() {
   const all = [];
 
   const seen = new Set();
+
+  const GENRE_PAGES =
+    Number(
+      process.env.FS15_GENRE_PAGES || 3
+    );
 
   const entries =
     Object.entries(
@@ -1419,34 +1425,78 @@ async function loadGenreSources() {
     try {
 
       console.log(
-        `FS15 genre source: ${genre}`
-      );
-
-      const items =
-        await loadGeneralSource(
-          absoluteUrl(source),
-          "movie"
-        );
-
-      console.log(
-        `FS15 genre source: ${genre} -> ${items.length}`
+        `FS15 genre : ${genre}`
       );
 
       for (
-        const item of items
+        let page = 1;
+        page <= GENRE_PAGES;
+        page++
       ) {
 
-        if (
-          !item ||
-          !item.id ||
-          seen.has(item.id)
-        ) {
-          continue;
+        const url =
+          buildPageUrl(
+            absoluteUrl(source),
+            page
+          );
+
+        console.log(
+          `FS15 genre ${genre}: page ${page}/${GENRE_PAGES}`
+        );
+
+        const html =
+          await fetchPage(url);
+
+        const items =
+          parseListing(
+            html,
+            "movie"
+          );
+
+        console.log(
+          `FS15 genre ${genre}: page ${page} -> ${items.length}`
+        );
+
+        if (!items.length) {
+          break;
         }
 
-        seen.add(item.id);
+        let newItems = 0;
 
-        all.push(item);
+        for (
+          const item of items
+        ) {
+
+          if (
+            !item ||
+            !item.id ||
+            seen.has(item.id)
+          ) {
+            continue;
+          }
+
+          seen.add(item.id);
+
+          all.push(item);
+
+          newItems++;
+
+        }
+
+        /*
+         * Protection contre une pagination
+         * qui renverrait exactement les mêmes films.
+         */
+
+        if (!newItems) {
+
+          console.log(
+            `FS15 genre ${genre}: page répétée, arrêt`
+          );
+
+          break;
+
+        }
 
       }
 
@@ -1455,7 +1505,7 @@ async function loadGenreSources() {
     catch (error) {
 
       console.error(
-        `FS15 genre source ${genre}:`,
+        `FS15 genre ${genre}:`,
         error.message
       );
 
