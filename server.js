@@ -5,7 +5,7 @@ const PAGES = Number(process.env.FS15_PAGES || 50);
 const PAGE_SIZE = Number(process.env.FS15_PAGE_SIZE || 18);
 const REFRESH_MS = Number(process.env.FS15_REFRESH_MS || 600000);
 const ENRICH_CONCURRENCY = Number(
-  process.env.FS15_ENRICH_CONCURRENCY || 8
+  process.env.FS15_ENRICH_CONCURRENCY || 24
 );
 
 let cache = [];
