@@ -1741,25 +1741,71 @@ async function refreshCache() {
 
 
     cache =
-      [
-        ...unique.values()
-      ];
+  [
+    ...unique.values()
+  ];
 
-
-    console.log(
-      `FS15 : ${cache.length} éléments uniques avant enrichissement`
-    );
-
-    
 
 console.log(
-  `FS15 : ${cache.length} éléments à enrichir après pré-filtre 2026+`
+  `FS15 : ${cache.length} éléments uniques avant pré-filtre`
 );
-    /* =====================================================
-       ENRICHISSEMENT
-       ===================================================== */
 
-    await enrichItems(
+
+/* =====================================================
+   PRÉ-FILTRE RAPIDE AVANT ENRICHISSEMENT
+   =====================================================
+
+   FILMS :
+   - 2026 conservé
+   - 2027 et années suivantes conservées
+   - 2025 et années précédentes supprimées
+
+   SÉRIES :
+   - totalement inchangées
+
+   Ce filtre utilise l'année déjà récupérée
+   sur la page de listing afin d'éviter
+   d'ouvrir inutilement les fiches anciennes.
+   ===================================================== */
+
+cache =
+  cache.filter(
+    item => {
+
+      if (
+        item.type !== "movie"
+      ) {
+
+        return true;
+
+      }
+
+
+      const year =
+        Number(
+          item.year
+        );
+
+
+      return (
+        Number.isFinite(year) &&
+        year >= 2026
+      );
+
+    }
+  );
+
+
+console.log(
+  `FS15 : ${cache.length} éléments après pré-filtre rapide 2026+`
+);
+
+
+/* =====================================================
+   ENRICHISSEMENT
+   ===================================================== */
+
+await enrichItems(
   cache
 );
 
