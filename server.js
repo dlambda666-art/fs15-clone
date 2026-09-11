@@ -1753,7 +1753,7 @@ async function refreshCache() {
     
 
 console.log(
-  `FS15 : ${cache.length} éléments à enrichir après pré-filtre 2025+`
+  `FS15 : ${cache.length} éléments à enrichir après pré-filtre 2026+`
 );
     /* =====================================================
        ENRICHISSEMENT
@@ -1765,16 +1765,15 @@ console.log(
 
 
 /* =====================================================
-   FILTRE FILMS : 2025 ET PLUS RECENT
+   FILTRE FILMS : 2026 ET PLUS RECENT
    =====================================================
 
    Les séries restent totalement inchangées.
 
    Pour les films :
-   - 2025 conservé
    - 2026 conservé
    - 2027 et années suivantes conservées
-   - 2024 et années précédentes supprimées
+   - 2025 et années précédentes supprimées
 
    Il n'y a volontairement AUCUN plafond d'année.
    ===================================================== */
@@ -1792,7 +1791,7 @@ cache =
 
       return (
         Number.isFinite(year) &&
-        year >= 2025
+        year >= 2026
       );
 
     }
@@ -1800,7 +1799,7 @@ cache =
 
 
 console.log(
-  `FS15 : ${cache.length} éléments après filtre 2025+`
+  `FS15 : ${cache.length} éléments après filtre 2026+`
 );
 
 
