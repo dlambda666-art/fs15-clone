@@ -1548,13 +1548,53 @@ async function refreshCache() {
        ===================================================== */
 
     await enrichItems(
-      cache
-    );
+  cache
+);
 
 
-    /* =====================================================
-       NORMALISATION FINALE DES GENRES
-       ===================================================== */
+/* =====================================================
+   FILTRE FILMS : 2025 ET PLUS RECENT
+   =====================================================
+
+   Les séries restent totalement inchangées.
+
+   Pour les films :
+   - 2025 conservé
+   - 2026 conservé
+   - 2027 et années suivantes conservées
+   - 2024 et années précédentes supprimées
+
+   Il n'y a volontairement AUCUN plafond d'année.
+   ===================================================== */
+
+cache =
+  cache.filter(
+    item => {
+
+      if (item.type !== "movie") {
+        return true;
+      }
+
+      const year =
+        Number(item.year);
+
+      return (
+        Number.isFinite(year) &&
+        year >= 2025
+      );
+
+    }
+  );
+
+
+console.log(
+  `FS15 : ${cache.length} éléments après filtre 2025+`
+);
+
+
+/* =====================================================
+   NORMALISATION FINALE DES GENRES
+   ===================================================== */
 
     for (
       const item of cache
