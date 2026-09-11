@@ -357,8 +357,14 @@ app.get(
 
       const total = items.length;
 
-items = await withFrenchPosters(items);
+items = items.slice(
+  offset,
+  offset + PAGE_SIZE
+);
 
+items = await withFrenchPosters(
+  items
+);
       res.json({
 
         page,
