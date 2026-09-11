@@ -4,8 +4,19 @@ const BASE_URL = "https://fs23.lol";
 const PAGES = Number(process.env.FS15_PAGES || 50);
 const PAGE_SIZE = Number(process.env.FS15_PAGE_SIZE || 18);
 const REFRESH_MS = Number(process.env.FS15_REFRESH_MS || 600000);
+
 const ENRICH_CONCURRENCY = Number(
   process.env.FS15_ENRICH_CONCURRENCY || 40
+);
+
+/*
+ * Nombre de sources de genres traitées simultanément.
+ *
+ * On reste volontairement raisonnable pour accélérer
+ * sans bombarder le site source.
+ */
+const GENRE_CONCURRENCY = Number(
+  process.env.FS15_GENRE_CONCURRENCY || 5
 );
 
 let cache = [];
@@ -493,28 +504,12 @@ function splitGenreText(value) {
 
 /* =========================================================
    EXTRACTION GENRES
-   =========================================================
-
-   SOURCE DE VERITE :
-
-   Le site original indique les genres directement
-   dans la fiche du film.
-
-   Exemple :
-
-   Genre: Action, Thriller
-
-   On lit donc la fiche elle-même.
    ========================================================= */
 
 function extractGenres($) {
 
   const genres = [];
 
-
-  /*
-   * GENRES PAR LIENS
-   */
 
   $(
     ".facts .genres a, " +
@@ -567,12 +562,6 @@ function extractGenres($) {
   );
 
 
-  /*
-   * FORME :
-   *
-   * Genre: Action, Thriller
-   */
-
   $("body *").each(
     (_i, element) => {
 
@@ -610,12 +599,6 @@ function extractGenres($) {
     }
   );
 
-
-  /*
-   * SECOURS :
-   *
-   * recherche dans le texte complet
-   */
 
   if (!genres.length) {
 
@@ -692,10 +675,6 @@ function extractCard(
   let node =
     $(link);
 
-
-  /*
-   * Remonte jusqu'au conteneur de la carte.
-   */
 
   for (
     let i = 0;
@@ -828,15 +807,6 @@ function extractCard(
 
     views: 0,
 
-    /*
-     * IMPORTANT :
-     *
-     * Aucun genre provenant de la liste.
-     *
-     * Les vrais genres seront récupérés
-     * sur la fiche lors de l'enrichissement.
-     */
-
     genres: [],
 
     country: [],
@@ -947,10 +917,6 @@ async function enrichItem(item) {
       );
 
 
-    /* =====================================================
-       TITRE
-       ===================================================== */
-
     const heading =
       $("h1")
         .first()
@@ -966,10 +932,6 @@ async function enrichItem(item) {
 
     }
 
-
-    /* =====================================================
-       POSTER
-       ===================================================== */
 
     const imageSelectors = [
 
@@ -1026,10 +988,6 @@ async function enrichItem(item) {
     }
 
 
-    /* =====================================================
-       LANGUE
-       ===================================================== */
-
     const version =
       pageText.match(
 
@@ -1065,10 +1023,6 @@ async function enrichItem(item) {
 
     }
 
-
-    /* =====================================================
-       QUALITE
-       ===================================================== */
 
     const quality =
       pageText.match(
@@ -1106,10 +1060,6 @@ async function enrichItem(item) {
     }
 
 
-    /* =====================================================
-       ANNEE
-       ===================================================== */
-
     const release =
       pageText.match(
         /Date de sortie\s*:\s*([^]+)/i
@@ -1144,20 +1094,9 @@ async function enrichItem(item) {
     }
 
 
-    /* =====================================================
-       GENRES
-       =====================================================
-
-       C'EST ICI QUE LE VRAI GENRE EST RECUPERE.
-       */
-
     item.genres =
       extractGenres($);
 
-
-    /* =====================================================
-       SYNOPSIS
-       ===================================================== */
 
     const synopsis =
       $("meta[name='description']")
@@ -1276,6 +1215,89 @@ function buildPageUrl(
 
 
 /* =========================================================
+   OUTIL : EXECUTION AVEC CONCURRENCE LIMITEE
+   ========================================================= */
+
+async function mapWithConcurrency(
+  items,
+  concurrency,
+  worker
+) {
+
+  const results =
+    new Array(items.length);
+
+  let nextIndex = 0;
+
+
+  async function runner() {
+
+    while (true) {
+
+      const index =
+        nextIndex++;
+
+
+      if (
+        index >= items.length
+      ) {
+
+        return;
+
+      }
+
+
+      try {
+
+        results[index] =
+          await worker(
+            items[index],
+            index
+          );
+
+      }
+
+      catch (error) {
+
+        console.error(
+          "FS15 worker:",
+          error.message
+        );
+
+        results[index] =
+          null;
+
+      }
+
+    }
+
+  }
+
+
+  const workers =
+    Math.min(
+      Math.max(
+        1,
+        concurrency
+      ),
+      items.length
+    );
+
+
+  await Promise.all(
+    Array.from(
+      { length: workers },
+      () => runner()
+    )
+  );
+
+
+  return results;
+
+}
+
+
+/* =========================================================
    CHARGEMENT GENERAL
    ========================================================= */
 
@@ -1359,13 +1381,6 @@ async function loadGeneralSource(
       }
 
 
-      /*
-       * Protection :
-       *
-       * si cstart renvoie exactement
-       * la même page, on arrête.
-       */
-
       if (!newItems) {
 
         console.log(
@@ -1394,17 +1409,21 @@ async function loadGeneralSource(
 
 }
 
+
 /* =========================================================
-   CHARGEMENT DES FILMS PAR GENRE
-   2026 ET PLUS
-   MAX 50 FILMS PAR GENRE
+   CHARGEMENT D'UN GENRE
+   =========================================================
+
+   Chaque genre conserve sa pagination séquentielle.
+   Seuls les GENRES DIFFERENTS sont exécutés en parallèle.
    ========================================================= */
 
-async function loadGenreSources() {
+async function loadOneGenreSource(
+  genre,
+  source
+) {
 
-  const all = [];
-
-  const seen = new Set();
+  const results = [];
 
   const GENRE_PAGES =
     Number(
@@ -1416,133 +1435,114 @@ async function loadGenreSources() {
       process.env.FS15_GENRE_MAX || 50
     );
 
-  const entries =
-    Object.entries(
-      GENRE_SOURCES
-    );
+
+  console.log(
+    `FS15 genre : ${genre} — objectif ${GENRE_MAX} films 2026+`
+  );
+
+
+  let genreCount = 0;
+
 
   for (
-    const [
-      genre,
-      source
-    ] of entries
+    let page = 1;
+    page <= GENRE_PAGES;
+    page++
   ) {
+
+    if (
+      genreCount >= GENRE_MAX
+    ) {
+
+      break;
+
+    }
+
 
     try {
 
+      const url =
+        buildPageUrl(
+          absoluteUrl(source),
+          page
+        );
+
+
       console.log(
-        `FS15 genre : ${genre} — objectif ${GENRE_MAX} films 2026+`
+        `FS15 genre ${genre}: page ${page}/${GENRE_PAGES}`
       );
 
-      let genreCount = 0;
+
+      const html =
+        await fetchPage(url);
+
+
+      const items =
+        parseListing(
+          html,
+          "movie"
+        );
+
+
+      console.log(
+        `FS15 genre ${genre}: page ${page} -> ${items.length}`
+      );
+
+
+      if (!items.length) {
+
+        break;
+
+      }
+
+
+      let newItems = 0;
+
 
       for (
-        let page = 1;
-        page <= GENRE_PAGES;
-        page++
+        const item of items
       ) {
+
+        if (
+          !item ||
+          !item.id
+        ) {
+
+          continue;
+
+        }
+
+
+        /*
+         * FILMS 2026 ET PLUS UNIQUEMENT
+         */
+
+        const year =
+          Number(
+            item.year
+          );
+
+
+        if (
+          !Number.isFinite(year) ||
+          year < 2026
+        ) {
+
+          continue;
+
+        }
+
+
+        results.push(item);
+
+        genreCount++;
+
+        newItems++;
+
 
         if (
           genreCount >= GENRE_MAX
         ) {
-          break;
-        }
-
-        const url =
-          buildPageUrl(
-            absoluteUrl(source),
-            page
-          );
-
-        console.log(
-          `FS15 genre ${genre}: page ${page}/${GENRE_PAGES}`
-        );
-
-        const html =
-          await fetchPage(url);
-
-        const items =
-          parseListing(
-            html,
-            "movie"
-          );
-
-        console.log(
-          `FS15 genre ${genre}: page ${page} -> ${items.length}`
-        );
-
-        if (!items.length) {
-          break;
-        }
-
-        let newItems = 0;
-
-        for (
-          const item of items
-        ) {
-
-          if (
-            !item ||
-            !item.id
-          ) {
-            continue;
-          }
-
-          /*
-           * FILMS 2026 ET PLUS UNIQUEMENT
-           */
-
-          const year =
-            Number(
-              item.year
-            );
-
-          if (
-            !Number.isFinite(year) ||
-            year < 2026
-          ) {
-            continue;
-          }
-
-          /*
-           * Déduplication globale
-           */
-
-          if (
-            seen.has(item.id)
-          ) {
-            continue;
-          }
-
-          seen.add(item.id);
-
-          all.push(item);
-
-          genreCount++;
-          newItems++;
-
-          /*
-           * Maximum 50 films par genre
-           */
-
-          if (
-            genreCount >= GENRE_MAX
-          ) {
-            break;
-          }
-
-        }
-
-        /*
-         * Protection contre les pages
-         * qui ne fournissent plus rien de nouveau.
-         */
-
-        if (!newItems) {
-
-          console.log(
-            `FS15 genre ${genre}: aucune nouvelle sortie 2026+ sur cette page, arrêt`
-          );
 
           break;
 
@@ -1550,16 +1550,23 @@ async function loadGenreSources() {
 
       }
 
-      console.log(
-        `FS15 genre ${genre}: ${genreCount} films 2026+ retenus`
-      );
+
+      if (!newItems) {
+
+        console.log(
+          `FS15 genre ${genre}: aucune nouvelle sortie 2026+ sur cette page, arrêt`
+        );
+
+        break;
+
+      }
 
     }
 
     catch (error) {
 
       console.error(
-        `FS15 genre ${genre}:`,
+        `FS15 genre ${genre} page ${page}:`,
         error.message
       );
 
@@ -1567,13 +1574,119 @@ async function loadGenreSources() {
 
   }
 
+
+  console.log(
+    `FS15 genre ${genre}: ${results.length} films 2026+ retenus`
+  );
+
+
+  return results;
+
+}
+
+
+/* =========================================================
+   CHARGEMENT DES FILMS PAR GENRE
+   2026 ET PLUS
+   MAX 50 FILMS PAR GENRE
+   ========================================================= */
+
+async function loadGenreSources() {
+
+  const GENRE_CONCURRENCY =
+    Number(
+      process.env.FS15_GENRE_CONCURRENCY || 5
+    );
+
+
+  const entries =
+    Object.entries(
+      GENRE_SOURCES
+    );
+
+
+  console.log(
+    `FS15 : chargement de ${entries.length} genres avec ${GENRE_CONCURRENCY} genres simultanés`
+  );
+
+
+  /*
+   * Les genres différents sont chargés en parallèle,
+   * mais chaque genre garde ses pages dans l'ordre.
+   */
+
+  const genreResults =
+    await mapWithConcurrency(
+      entries,
+      GENRE_CONCURRENCY,
+      async (
+        [genre, source]
+      ) => {
+
+        return loadOneGenreSource(
+          genre,
+          source
+        );
+
+      }
+    );
+
+
+  /*
+   * Déduplication globale.
+   *
+   * Important :
+   * un même film peut apparaître dans plusieurs genres.
+   */
+
+  const all = [];
+
+  const seen =
+    new Set();
+
+
+  for (
+    const results of genreResults
+  ) {
+
+    if (!Array.isArray(results)) {
+      continue;
+    }
+
+
+    for (
+      const item of results
+    ) {
+
+      if (
+        !item ||
+        !item.id ||
+        seen.has(item.id)
+      ) {
+
+        continue;
+
+      }
+
+
+      seen.add(item.id);
+
+      all.push(item);
+
+    }
+
+  }
+
+
   console.log(
     `FS15 : ${all.length} films 2026+ récupérés depuis les sources de genres`
   );
 
+
   return all;
 
 }
+
 
 /* =========================================================
    REFRESH COMPLET
@@ -1612,6 +1725,11 @@ async function refreshCache() {
 
 
     console.log(
+      `FS15 : ${GENRE_CONCURRENCY} sources de genres simultanées`
+    );
+
+
+    console.log(
       "========================================"
     );
 
@@ -1622,54 +1740,44 @@ async function refreshCache() {
 
 
     /* =====================================================
-       FILMS
+       FILMS + SERIES EN PARALLELE
        ===================================================== */
 
-    try {
+    const generalResults =
+      await Promise.all([
 
-      films =
-        await loadGeneralSource(
+        loadGeneralSource(
           SOURCES.films,
           "movie"
-        );
+        ),
 
-    }
+        loadGeneralSource(
+          SOURCES.series,
+          "series"
+        )
 
-    catch (error) {
+      ]);
 
-      console.error(
-        "FS15 films:",
-        error.message
-      );
 
-    }
+    films =
+      generalResults[0] || [];
+
+
+    series =
+      generalResults[1] || [];
+
+
+    console.log(
+      `FS15 : ${films.length} films généraux récupérés`
+    );
+
+
+    console.log(
+      `FS15 : ${series.length} séries générales récupérées`
+    );
 
 
     /* =====================================================
-       SERIES
-       ===================================================== */
-
-    try {
-
-      series =
-        await loadGeneralSource(
-          SOURCES.series,
-          "series"
-        );
-
-    }
-
-    catch (error) {
-
-      console.error(
-        "FS15 séries:",
-        error.message
-      );
-
-    }
-
-
-        /* =====================================================
        AJOUT DES FILMS PAR GENRE
        ===================================================== */
 
@@ -1678,10 +1786,12 @@ async function refreshCache() {
       const genreFilms =
         await loadGenreSources();
 
+
       films = [
         ...films,
         ...genreFilms
       ];
+
 
       console.log(
         `FS15 : ${genreFilms.length} films ajoutés depuis les sources de genres`
@@ -1697,6 +1807,8 @@ async function refreshCache() {
       );
 
     }
+
+
     /* =====================================================
        DEDUPLICATION
        ===================================================== */
@@ -1741,67 +1853,75 @@ async function refreshCache() {
 
 
     cache =
-  [
-    ...unique.values()
-  ];
+      [
+        ...unique.values()
+      ];
 
 
-console.log(
-  `FS15 : ${cache.length} éléments uniques avant enrichissement`
-);
+    console.log(
+      `FS15 : ${cache.length} éléments uniques avant enrichissement`
+    );
 
 
-/* =====================================================
-   ENRICHISSEMENT
-   ===================================================== */
+    /* =====================================================
+       ENRICHISSEMENT
+       ===================================================== */
 
-await enrichItems(
-  cache
-);
+    await enrichItems(
+      cache
+    );
 
 
-/* =====================================================
-   FILTRE FILMS : 2026 ET PLUS RECENT
-   =====================================================
+    /* =====================================================
+       FILTRE FILMS : 2026 ET PLUS
+       =====================================================
 
-   Les séries restent totalement inchangées.
+       Les séries restent totalement inchangées.
 
-   Pour les films :
-   - 2026 conservé
-   - 2027 et années suivantes conservées
-   - 2025 et années précédentes supprimées
+       Pour les films :
+       - 2026 conservé
+       - 2027 et années suivantes conservées
+       - 2025 et années précédentes supprimées
 
-   Il n'y a volontairement AUCUN plafond d'année.
-   ===================================================== */
+       Aucun plafond d'année.
+       ===================================================== */
 
-cache =
-  cache.filter(
-    item => {
+    cache =
+      cache.filter(
+        item => {
 
-      if (item.type !== "movie") {
-        return true;
-      }
+          if (
+            item.type !== "movie"
+          ) {
 
-      const year =
-        Number(item.year);
+            return true;
 
-      return (
-        Number.isFinite(year) &&
-        year >= 2026
+          }
+
+
+          const year =
+            Number(
+              item.year
+            );
+
+
+          return (
+            Number.isFinite(year) &&
+            year >= 2026
+          );
+
+        }
       );
 
-    }
-  );
+
+    console.log(
+      `FS15 : ${cache.length} éléments après filtre 2026+`
+    );
 
 
-console.log(
-  `FS15 : ${cache.length} éléments après filtre 2026+`
-);
-
-
-/* =====================================================
-   NORMALISATION FINALE DES GENRES
-   ===================================================== */
+    /* =====================================================
+       NORMALISATION FINALE DES GENRES
+       ===================================================== */
 
     for (
       const item of cache
