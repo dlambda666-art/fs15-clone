@@ -1614,6 +1614,34 @@ async function refreshCache() {
     }
 
 
+        /* =====================================================
+       AJOUT DES FILMS PAR GENRE
+       ===================================================== */
+
+    try {
+
+      const genreFilms =
+        await loadGenreSources();
+
+      films = [
+        ...films,
+        ...genreFilms
+      ];
+
+      console.log(
+        `FS15 : ${genreFilms.length} films ajoutés depuis les sources de genres`
+      );
+
+    }
+
+    catch (error) {
+
+      console.error(
+        "FS15 genres:",
+        error.message
+      );
+
+    }
     /* =====================================================
        DEDUPLICATION
        ===================================================== */
