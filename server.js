@@ -1394,7 +1394,82 @@ async function loadGeneralSource(
 
 }
 
+/* =========================================================
+   CHARGEMENT DES SOURCES PAR GENRE
+   ========================================================= */
 
+async function loadGenreSources() {
+
+  const all = [];
+
+  const seen = new Set();
+
+  const entries =
+    Object.entries(
+      GENRE_SOURCES
+    );
+
+  for (
+    const [
+      genre,
+      source
+    ] of entries
+  ) {
+
+    try {
+
+      console.log(
+        `FS15 genre source: ${genre}`
+      );
+
+      const items =
+        await loadGeneralSource(
+          absoluteUrl(source),
+          "movie"
+        );
+
+      console.log(
+        `FS15 genre source: ${genre} -> ${items.length}`
+      );
+
+      for (
+        const item of items
+      ) {
+
+        if (
+          !item ||
+          !item.id ||
+          seen.has(item.id)
+        ) {
+          continue;
+        }
+
+        seen.add(item.id);
+
+        all.push(item);
+
+      }
+
+    }
+
+    catch (error) {
+
+      console.error(
+        `FS15 genre source ${genre}:`,
+        error.message
+      );
+
+    }
+
+  }
+
+  console.log(
+    `FS15 : ${all.length} films récupérés depuis les sources de genres`
+  );
+
+  return all;
+
+}
 /* =========================================================
    REFRESH COMPLET
    ========================================================= */
